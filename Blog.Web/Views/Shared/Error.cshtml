@@ -1,0 +1,14 @@
+﻿@model Blog.Web.ViewModels.ErrorViewModel
+@{
+    ViewData["Title"] = "Ошибка";
+}
+
+<h1 class="text-danger">Произошла ошибка.</h1>
+<h2 class="text-danger">Во время обработки вашего запроса произошел сбой.</h2>
+
+@if (Model?.ShowRequestId ?? false)
+{
+    <p>
+        <strong>Request ID:</strong> <code>@Model.RequestId</code>
+    </p>
+}
