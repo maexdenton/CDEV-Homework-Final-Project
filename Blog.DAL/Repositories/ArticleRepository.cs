@@ -6,14 +6,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Blog.DAL.Repositories
 {
+    /// <summary>
+    /// Репозиторий доступа к данным статей в базе данных SQL Server
+    /// </summary>
     public class ArticleRepository : IArticleRepository
     {
         private readonly BlogDbContext _context;
 
-        public ArticleRepository(BlogDbContext context) => _context = context;
+        public ArticleRepository(BlogDbContext context)
+        {
+            _context = context;
+        }
 
         public async Task<IEnumerable<Article>> GetAllAsync() =>
-            await _context.Articles.Include(a => a.Author).Include(a => a.Tags).AsNoTracking().ToListAsync();
+            await _context.Articles
+                .Include(a => a.Author)
+                .Include(a => a.Tags)
+                .AsNoTracking()
+                .ToListAsync();
 
         public async Task<Article?> GetByIdAsync(int id) =>
             await _context.Articles.FindAsync(id);
@@ -22,7 +32,8 @@ namespace Blog.DAL.Repositories
             await _context.Articles
                 .Include(a => a.Author)
                 .Include(a => a.Tags)
-                .Include(a => a.Comments).ThenInclude(c => c.Author)
+                .Include(a => a.Comments)
+                    .ThenInclude(c => c.Author)
                 .FirstOrDefaultAsync(a => a.Id == id);
 
         public async Task<IEnumerable<Article>> GetFilteredAsync(string? search, string? tag)
@@ -47,6 +58,18 @@ namespace Blog.DAL.Repositories
             }
 
             return await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Article>> GetByAuthorIdAsync(string authorId)
+        {
+            return await _context.Articles
+                .Include(a => a.Author)
+                .Include(a => a.Tags)
+                .Include(a => a.Comments)
+                .Where(a => a.AuthorId == authorId)
+                .OrderByDescending(a => a.CreatedAt)
+                .AsNoTracking()
+                .ToListAsync();
         }
 
         public async Task AddAsync(Article entity) => await _context.Articles.AddAsync(entity);
