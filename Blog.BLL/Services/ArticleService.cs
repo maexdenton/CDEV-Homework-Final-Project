@@ -7,35 +7,55 @@ using Blog.DAL.Repositories;
 
 namespace Blog.BLL.Services
 {
+    /// <summary>
+    /// Сервис бизнес-логики управления публикациями блога
+    /// </summary>
     public class ArticleService : IArticleService
     {
         private readonly IArticleRepository _articleRepo;
         private readonly ITagRepository _tagRepo;
-        private readonly ICommentRepository _commentRepo;
 
-        public ArticleService(IArticleRepository articleRepo, ITagRepository tagRepo, ICommentRepository commentRepo)
+        public ArticleService(IArticleRepository articleRepo, ITagRepository tagRepo)
         {
             _articleRepo = articleRepo;
             _tagRepo = tagRepo;
-            _commentRepo = commentRepo;
         }
 
-        public async Task<IEnumerable<ArticleDto>> GetArticlesAsync(string? search = null, string? tag = null)
+        public async Task<ArticleDto> CreateAsync(CreateArticleDto dto)
+        {
+            // Разрешение тегов (поиск существующих или добавление новых)
+            var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags);
+
+            var article = new Article
+            {
+                Title = dto.Title.Trim(),
+                Content = dto.Content,
+                AuthorId = dto.AuthorId,
+                CreatedAt = DateTime.UtcNow,
+                Tags = tags
+            };
+
+            await _articleRepo.AddAsync(article);
+            await _articleRepo.SaveChangesAsync();
+
+            // Загружаем данные для формирования полного DTO с автором
+            var created = await _articleRepo.GetDetailedByIdAsync(article.Id);
+            return MapToDto(created!);
+        }
+
+        public async Task<IEnumerable<ArticleDto>> GetAllAsync(string? search = null, string? tag = null)
         {
             var articles = await _articleRepo.GetFilteredAsync(search, tag);
-            return articles.Select(a => new ArticleDto(
-                a.Id,
-                a.Title,
-                a.Content,
-                a.CreatedAt,
-                a.AuthorId,
-                $"{a.Author.FirstName} {a.Author.LastName}".Trim(),
-                a.Tags.Select(t => t.Name).ToList(),
-                a.Comments.Count
-            ));
+            return articles.Select(MapToDto);
         }
 
-        public async Task<ArticleDetailsDto?> GetArticleByIdAsync(int id)
+        public async Task<IEnumerable<ArticleDto>> GetByAuthorIdAsync(string authorId)
+        {
+            var articles = await _articleRepo.GetByAuthorIdAsync(authorId);
+            return articles.Select(MapToDto);
+        }
+
+        public async Task<ArticleDetailsDto?> GetByIdAsync(int id)
         {
             var a = await _articleRepo.GetDetailedByIdAsync(id);
             if (a == null) return null;
@@ -45,43 +65,27 @@ namespace Blog.BLL.Services
                 a.Title,
                 a.Content,
                 a.CreatedAt,
+                a.UpdatedAt,
                 a.AuthorId,
                 $"{a.Author.FirstName} {a.Author.LastName}".Trim(),
                 a.Tags.Select(t => t.Name).ToList(),
                 a.Comments.OrderByDescending(c => c.CreatedAt).Select(c => new CommentDto(
                     c.Id,
+                    c.ArticleId,
                     c.Content,
                     c.CreatedAt,
+                    c.AuthorId,
                     $"{c.Author.FirstName} {c.Author.LastName}".Trim()
                 )).ToList()
             );
         }
 
-        public async Task<int> CreateArticleAsync(CreateArticleDto dto)
+        public async Task<bool> UpdateAsync(int id, UpdateArticleDto dto)
         {
-            var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags);
+            var article = await _articleRepo.GetDetailedByIdAsync(id);
+            if (article == null) return false;
 
-            var article = new Article
-            {
-                Title = dto.Title,
-                Content = dto.Content,
-                AuthorId = dto.AuthorId,
-                CreatedAt = DateTime.UtcNow,
-                Tags = tags
-            };
-
-            await _articleRepo.AddAsync(article);
-            await _articleRepo.SaveChangesAsync();
-            return article.Id;
-        }
-
-        public async Task<bool> UpdateArticleAsync(EditArticleDto dto)
-        {
-            var article = await _articleRepo.GetDetailedByIdAsync(dto.Id);
-            if (article == null || article.AuthorId != dto.UserId)
-                return false;
-
-            article.Title = dto.Title;
+            article.Title = dto.Title.Trim();
             article.Content = dto.Content;
             article.UpdatedAt = DateTime.UtcNow;
 
@@ -97,29 +101,27 @@ namespace Blog.BLL.Services
             return true;
         }
 
-        public async Task<bool> DeleteArticleAsync(int id, string requestingUserId)
+        public async Task<bool> DeleteAsync(int id)
         {
             var article = await _articleRepo.GetByIdAsync(id);
-            if (article == null || article.AuthorId != requestingUserId)
-                return false;
+            if (article == null) return false;
 
             _articleRepo.Delete(article);
             await _articleRepo.SaveChangesAsync();
             return true;
         }
 
-        public async Task AddCommentAsync(CreateCommentDto dto)
-        {
-            var comment = new Comment
-            {
-                ArticleId = dto.ArticleId,
-                Content = dto.Content,
-                AuthorId = dto.AuthorId,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _commentRepo.AddAsync(comment);
-            await _commentRepo.SaveChangesAsync();
-        }
+        private static ArticleDto MapToDto(Article a) =>
+            new(
+                a.Id,
+                a.Title,
+                a.Content,
+                a.CreatedAt,
+                a.UpdatedAt,
+                a.AuthorId,
+                $"{a.Author?.FirstName} {a.Author?.LastName}".Trim(),
+                a.Tags.Select(t => t.Name).ToList(),
+                a.Comments?.Count ?? 0
+            );
     }
 }

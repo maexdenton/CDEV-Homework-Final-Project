@@ -10,13 +10,12 @@ namespace Blog.Web
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Строка подключения к SQL Server
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+                ?? throw new InvalidOperationException("Строка подключения 'DefaultConnection' не найдена.");
 
             // Регистрация DAL: Контекст БД и Репозитории
             builder.Services.AddDbContext<BlogDbContext>(options =>
@@ -27,9 +26,12 @@ namespace Blog.Web
             builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 
             // Регистрация BLL: Бизнес-сервисы
+            builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IArticleService, ArticleService>();
+            builder.Services.AddScoped<ITagService, TagService>();
+            builder.Services.AddScoped<ICommentService, CommentService>();
 
-            // Настройка ASP.NET Core Identity
+            // Настройка Identity
             builder.Services.AddIdentity<User, IdentityRole>(options =>
             {
                 options.Password.RequireDigit = false;
@@ -47,42 +49,52 @@ namespace Blog.Web
                 options.AccessDeniedPath = "/Account/AccessDenied";
             });
 
-            // Presentation: Регистрация MVC и API контроллеров
+            // Поддержка MVC-представлений (Razor) и API-контроллеров
             builder.Services.AddControllersWithViews();
             builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
-            // Подключение кастомного глобального обработчика исключений
+            // Глобальная обработка ошибок
             app.UseMiddleware<GlobalExceptionMiddleware>();
 
-            if (!app.Environment.IsDevelopment())
+            if (app.Environment.IsDevelopment())
             {
-                app.UseHsts();
+                app.UseSwagger();
+                app.UseSwaggerUI();
             }
 
             app.UseHttpsRedirection();
-            app.UseStaticFiles();
+            app.UseStaticFiles(); // Разрешаем раздачу css/js/стилей
 
             app.UseRouting();
 
             app.UseAuthentication();
             app.UseAuthorization();
 
+            // Маршрут по умолчанию - открывает главную страницу блога при старте
             app.MapControllerRoute(
                 name: "default",
-                pattern: "{controller=Article}/{action=Index}/{id?}");
+                pattern: "{controller=Home}/{action=Index}/{id?}");
 
+            // Подключение маршрутов REST API ([Route("api/[controller]")])
             app.MapControllers();
 
-            // Автоматическое применение миграций при старте
+            // Автоматическое применение миграций и создание роли "Пользователь"
             using (var scope = app.Services.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<BlogDbContext>();
-                context.Database.Migrate();
+                await context.Database.MigrateAsync();
+
+                var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+                if (!await roleManager.RoleExistsAsync("Пользователь"))
+                {
+                    await roleManager.CreateAsync(new IdentityRole("Пользователь"));
+                }
             }
 
-            app.Run();
+            await app.RunAsync();
         }
     }
 }

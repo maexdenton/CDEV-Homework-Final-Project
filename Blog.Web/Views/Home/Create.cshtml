@@ -1,0 +1,31 @@
+﻿@{
+    ViewData["Title"] = "Новая статья";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="card-title mb-4">Создание новой статьи</h2>
+                <form asp-action="Create" method="post">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Заголовок статьи</label>
+                        <input type="text" name="title" class="form-control" placeholder="Введите название..." required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Теги (через запятую)</label>
+                        <input type="text" name="tags" class="form-control" placeholder="csharp, dotnet, architecture" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Текст публикации</label>
+                        <textarea name="content" class="form-control" rows="8" placeholder="Напишите текст..." required></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">Опубликовать</button>
+                        <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

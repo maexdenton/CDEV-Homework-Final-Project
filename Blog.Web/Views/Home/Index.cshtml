@@ -1,0 +1,78 @@
+﻿@model IEnumerable<Blog.BLL.DTOs.ArticleDto>
+
+@{
+    ViewData["Title"] = "Главная - Блог";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="display-5 fw-bold">Публикации блога</h1>
+    @if (User.Identity?.IsAuthenticated ?? false)
+    {
+        <a asp-action="Create" class="btn btn-success btn-lg">+ Написать статью</a>
+    }
+</div>
+
+<!-- Панель поиска -->
+<form method="get" asp-action="Index" class="card card-body p-3 shadow-sm mb-4">
+    <div class="row g-2">
+        <div class="col-md-9">
+            <input type="text" name="search" value="@ViewData["SearchQuery"]" class="form-control" placeholder="Поиск по ключевым словам или тексту статьи..." />
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100">Найти</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Сброс</a>
+        </div>
+    </div>
+</form>
+
+@if (ViewData["CurrentTag"] != null)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>Фильтр по тегу: <strong>#@ViewData["CurrentTag"]</strong></span>
+        <a asp-action="Index" class="btn btn-sm btn-close"></a>
+    </div>
+}
+
+<!-- Список статей -->
+@if (!Model.Any())
+{
+    <div class="text-center py-5">
+        <h4 class="text-muted">Статей пока нет</h4>
+        <p class="text-secondary">Будьте первым, кто опубликует запись!</p>
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var article in Model)
+        {
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h3 class="card-title">
+                            <a asp-action="Details" asp-route-id="@article.Id" class="text-decoration-none text-dark">
+                                @article.Title
+                            </a>
+                        </h3>
+                        <div class="text-muted small mb-3">
+                            <span>Автор: <strong>@article.AuthorFullName</strong></span> &bull;
+                            <span>@article.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                        </div>
+                        <p class="card-text">
+                            @(article.Content.Length > 250 ? article.Content[..250] + "..." : article.Content)
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                @foreach (var tag in article.Tags)
+                                {
+                                    <a asp-action="Index" asp-route-tag="@tag" class="badge bg-secondary text-decoration-none me-1">#@tag</a>
+                                }
+                            </div>
+                            <span class="text-muted small">💬 Комментариев: @article.CommentsCount</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

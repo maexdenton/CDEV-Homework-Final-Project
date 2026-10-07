@@ -1,65 +1,107 @@
-﻿using Blog.DAL.Entities;
+﻿using Blog.BLL.DTOs;
+using Blog.BLL.Services;
+using Blog.DAL.Entities;
 using Blog.Web.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
 {
+    /// <summary>
+    /// Контроллер аутентификации и регистрации для веб-интерфейса (MVC)
+    /// </summary>
     public class AccountController : Controller
     {
-        private readonly UserManager<User> _userManager;
+        private readonly IUserService _userService;
         private readonly SignInManager<User> _signInManager;
+        private readonly UserManager<User> _userManager;
 
-        public AccountController(UserManager<User> userManager, SignInManager<User> signInManager)
+        public AccountController(
+            IUserService userService,
+            SignInManager<User> signInManager,
+            UserManager<User> userManager)
         {
-            _userManager = userManager;
+            _userService = userService;
             _signInManager = signInManager;
+            _userManager = userManager;
         }
 
         [HttpGet]
-        public IActionResult Register() => View();
+        public IActionResult Register()
+        {
+            if (User.Identity?.IsAuthenticated ?? false)
+                return RedirectToAction("Index", "Home");
+
+            return View();
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model)
         {
-            if (!ModelState.IsValid) return View(model);
+            if (!ModelState.IsValid)
+                return View(model);
 
-            var user = new User
+            // Передаем регистрацию в BLL-сервис (там автоматически создается роль "Пользователь" и хэшируется пароль)
+            var dto = new RegisterUserDto
             {
-                UserName = model.Email,
-                Email = model.Email,
                 FirstName = model.FirstName,
-                LastName = model.LastName
+                LastName = model.LastName,
+                Email = model.Email,
+                Password = model.Password,
+                ConfirmPassword = model.ConfirmPassword
             };
 
-            var result = await _userManager.CreateAsync(user, model.Password);
-            if (result.Succeeded)
+            var (succeeded, error, userDto) = await _userService.RegisterAsync(dto);
+
+            if (!succeeded)
             {
-                await _signInManager.SignInAsync(user, isPersistent: false);
-                return RedirectToAction("Index", "Article");
+                ModelState.AddModelError(string.Empty, error ?? "Ошибка при регистрации.");
+                return View(model);
             }
 
-            foreach (var error in result.Errors)
-                ModelState.AddModelError(string.Empty, error.Description);
+            // Автоматический вход после успешной регистрации
+            var user = await _userManager.FindByIdAsync(userDto!.Id);
+            if (user != null)
+            {
+                await _signInManager.SignInAsync(user, isPersistent: false);
+            }
 
-            return View(model);
+            return RedirectToAction("Index", "Home");
         }
 
         [HttpGet]
-        public IActionResult Login() => View();
+        public IActionResult Login(string? returnUrl = null)
+        {
+            if (User.Identity?.IsAuthenticated ?? false)
+                return RedirectToAction("Index", "Home");
+
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginViewModel model)
+        public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
-            if (!ModelState.IsValid) return View(model);
+            if (!ModelState.IsValid)
+                return View(model);
 
-            var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, isPersistent: true, false);
+            var result = await _signInManager.PasswordSignInAsync(
+                model.Email,
+                model.Password,
+                isPersistent: true,
+                lockoutOnFailure: false);
+
             if (result.Succeeded)
-                return RedirectToAction("Index", "Article");
+            {
+                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                    return Redirect(returnUrl);
 
-            ModelState.AddModelError(string.Empty, "Неверный логин или пароль");
+                return RedirectToAction("Index", "Home");
+            }
+
+            ModelState.AddModelError(string.Empty, "Неверный адрес электронной почты или пароль.");
             return View(model);
         }
 
@@ -68,7 +110,7 @@ namespace Blog.Web.Controllers
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();
-            return RedirectToAction("Index", "Article");
+            return RedirectToAction("Index", "Home");
         }
     }
 }
