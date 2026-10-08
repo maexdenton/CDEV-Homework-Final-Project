@@ -5,9 +5,16 @@ using System.Text;
 
 namespace Blog.DAL.Repositories
 {
+    /// <summary>
+    /// Контракт репозитория тегов с поддержкой привязки создателя
+    /// </summary>
     public interface ITagRepository : IRepository<Tag>
     {
         Task<Tag?> GetByNameAsync(string name);
-        Task<List<Tag>> GetOrCreateTagsAsync(IEnumerable<string> tagNames);
+
+        /// <summary>
+        /// Разрешает список тегов: находит существующие и создает отсутствующие с фиксацией автора
+        /// </summary>
+        Task<List<Tag>> GetOrCreateTagsAsync(IEnumerable<string> tagNames, string? creatorId = null);
     }
 }

@@ -1,5 +1,7 @@
 ﻿using Blog.BLL.DTOs;
+using Blog.BLL.Security;
 using Blog.BLL.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
@@ -8,54 +10,36 @@ namespace Blog.Web.Controllers
     /// Контроллер управления пользователями и регистрации.
     /// Предоставляет RESTful endpoints для CRUD-операций над пользователями
     /// </summary>
-    [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    public class UserController : ControllerBase
+    public class UserController : BaseApiController
     {
         private readonly IUserService _userService;
-        private readonly ILogger<UserController> _logger;
 
-        public UserController(IUserService userService, ILogger<UserController> logger)
+        public UserController(IUserService userService)
         {
             _userService = userService;
-            _logger = logger;
         }
 
         /// <summary>
-        /// Регистрация нового пользователя с автоматическим присвоением роли "Пользователь"
+        /// Регистрация нового пользователя. Открытый доступ.
+        /// Автоматически присваивает базовую роль "Пользователь"
         /// </summary>
-        /// <param name="dto">Данные учетной записи для регистрации</param>
-        /// <response code="201">Пользователь успешно зарегистрирован</response>
-        /// <response code="400">Ошибки валидации пароля или полей</response>
-        /// <response code="409">Пользователь с таким email уже существует</response>
         [HttpPost("register")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var (succeeded, error, user) = await _userService.RegisterAsync(dto);
-
-            if (!succeeded)
-            {
-                if (error!.Contains("уже зарегистрирован", StringComparison.OrdinalIgnoreCase))
-                    return Conflict(new { message = error });
-
-                return BadRequest(new { message = error });
-            }
-
-            _logger.LogInformation("Зарегистрирован новый пользователь ID={UserId}", user!.Id);
-            return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
+            var result = await _userService.RegisterAsync(dto);
+            return ToActionResult(result, user => CreatedAtAction(nameof(GetById), new { id = user.Id }, user));
         }
 
         /// <summary>
-        /// Получение списка всех зарегистрированных пользователей
+        /// Получение реестра всех пользователей. Доступно только Администратору
         /// </summary>
         [HttpGet]
+        [Authorize(Policy = AppPermissions.UsersView)]
         [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll()
         {
@@ -64,57 +48,54 @@ namespace Blog.Web.Controllers
         }
 
         /// <summary>
-        /// Получение информации о пользователе по его идентификатору
+        /// Просмотр профиля: Администратор может просматривать любого, Пользователь — только себя
         /// </summary>
-        /// <param name="id">GUID идентификатор пользователя</param>
         [HttpGet("{id}")]
+        [Authorize]
         [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetById(string id)
         {
-            var user = await _userService.GetByIdAsync(id);
-            if (user == null)
-                return NotFound(new { message = $"Пользователь с ID '{id}' не найден." });
-
-            return Ok(user);
+            var result = await _userService.GetByIdAsync(id, CurrentUserId, IsAdmin);
+            return ToActionResult(result, Ok);
         }
 
         /// <summary>
-        /// Редактирование профиля пользователя (имя, фамилия, телефон)
+        /// Редактирование профиля: только владелец или Администратор
         /// </summary>
-        /// <param name="id">Идентификатор редактируемого пользователя</param>
-        /// <param name="dto">Новые данные профиля</param>
         [HttpPut("{id}")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateUserDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var updated = await _userService.UpdateAsync(id, dto);
-            if (!updated)
-                return NotFound(new { message = $"Пользователь с ID '{id}' не найден." });
-
-            return NoContent();
+            var result = await _userService.UpdateAsync(id, dto, CurrentUserId, IsAdmin);
+            return ToActionResult(result);
         }
 
         /// <summary>
-        /// Удаление учетной записи пользователя
+        /// Удаление аккаунта: только Администратор
         /// </summary>
-        /// <param name="id">Идентификатор удаляемого пользователя</param>
         [HttpDelete("{id}")]
+        [Authorize(Policy = AppPermissions.UsersDelete)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Delete(string id)
         {
-            var deleted = await _userService.DeleteAsync(id);
-            if (!deleted)
-                return NotFound(new { message = $"Пользователь с ID '{id}' не найден." });
+            var result = await _userService.DeleteAsync(id, CurrentUserId, IsAdmin);
+            return ToActionResult(result);
+        }
 
-            _logger.LogWarning("Удален пользователь ID={UserId}", id);
-            return NoContent();
+        /// <summary>
+        /// Управление ролями: только Администратор
+        /// </summary>
+        [HttpPut("{id}/role")]
+        [Authorize(Policy = AppPermissions.RolesManage)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> ChangeRole(string id, [FromBody] ChangeUserRoleDto dto)
+        {
+            var result = await _userService.ChangeUserRoleAsync(id, dto.RoleName);
+            return ToActionResult(result);
         }
     }
 }

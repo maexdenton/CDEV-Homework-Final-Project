@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Text;
 using Blog.BLL.DTOs;
+using Blog.BLL.Security;
 using Blog.DAL.Entities;
 using Blog.DAL.Repositories;
 
 namespace Blog.BLL.Services
 {
     /// <summary>
-    /// Сервис бизнес-логики управления публикациями блога
+    /// Сервис статей с защитой от подмены автора и проверкой владения
     /// </summary>
     public class ArticleService : IArticleService
     {
@@ -21,16 +22,16 @@ namespace Blog.BLL.Services
             _tagRepo = tagRepo;
         }
 
-        public async Task<ArticleDto> CreateAsync(CreateArticleDto dto)
+        public async Task<ArticleDto> CreateAsync(CreateArticleDto dto, string currentUserId)
         {
-            // Разрешение тегов (поиск существующих или добавление новых)
-            var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags);
+            // Идентификатор автора жестко привязывается к текущему пользователю из claims
+            var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags, currentUserId);
 
             var article = new Article
             {
                 Title = dto.Title.Trim(),
                 Content = dto.Content,
-                AuthorId = dto.AuthorId,
+                AuthorId = currentUserId, // Защита от Over-Posting / подмены автора
                 CreatedAt = DateTime.UtcNow,
                 Tags = tags
             };
@@ -38,7 +39,6 @@ namespace Blog.BLL.Services
             await _articleRepo.AddAsync(article);
             await _articleRepo.SaveChangesAsync();
 
-            // Загружаем данные для формирования полного DTO с автором
             var created = await _articleRepo.GetDetailedByIdAsync(article.Id);
             return MapToDto(created!);
         }
@@ -61,35 +61,31 @@ namespace Blog.BLL.Services
             if (a == null) return null;
 
             return new ArticleDetailsDto(
-                a.Id,
-                a.Title,
-                a.Content,
-                a.CreatedAt,
-                a.UpdatedAt,
-                a.AuthorId,
+                a.Id, a.Title, a.Content, a.CreatedAt, a.UpdatedAt, a.AuthorId,
                 $"{a.Author.FirstName} {a.Author.LastName}".Trim(),
                 a.Tags.Select(t => t.Name).ToList(),
                 a.Comments.OrderByDescending(c => c.CreatedAt).Select(c => new CommentDto(
-                    c.Id,
-                    c.ArticleId,
-                    c.Content,
-                    c.CreatedAt,
-                    c.AuthorId,
+                    c.Id, c.ArticleId, c.Content, c.CreatedAt, c.AuthorId,
                     $"{c.Author.FirstName} {c.Author.LastName}".Trim()
                 )).ToList()
             );
         }
 
-        public async Task<bool> UpdateAsync(int id, UpdateArticleDto dto)
+        public async Task<ServiceResult> UpdateAsync(int id, UpdateArticleDto dto, string currentUserId, bool isElevated)
         {
             var article = await _articleRepo.GetDetailedByIdAsync(id);
-            if (article == null) return false;
+            if (article == null)
+                return ServiceResult.NotFound("Статья не найдена.");
+
+            // Владелец, Модератор или Администратор имеют право на редактирование
+            if (article.AuthorId != currentUserId && !isElevated)
+                return ServiceResult.Forbidden("Вы не являетесь автором этой статьи и не имеете прав модератора.");
 
             article.Title = dto.Title.Trim();
             article.Content = dto.Content;
             article.UpdatedAt = DateTime.UtcNow;
 
-            var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags);
+            var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags, currentUserId);
             article.Tags.Clear();
             foreach (var tag in tags)
             {
@@ -98,27 +94,27 @@ namespace Blog.BLL.Services
 
             _articleRepo.Update(article);
             await _articleRepo.SaveChangesAsync();
-            return true;
+            return ServiceResult.Ok();
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<ServiceResult> DeleteAsync(int id, string currentUserId, bool isElevated)
         {
             var article = await _articleRepo.GetByIdAsync(id);
-            if (article == null) return false;
+            if (article == null)
+                return ServiceResult.NotFound("Статья не найдена.");
+
+            // Удалять может автор, Модератор или Администратор
+            if (article.AuthorId != currentUserId && !isElevated)
+                return ServiceResult.Forbidden("Вы не можете удалить чужую публикацию.");
 
             _articleRepo.Delete(article);
             await _articleRepo.SaveChangesAsync();
-            return true;
+            return ServiceResult.Ok();
         }
 
         private static ArticleDto MapToDto(Article a) =>
             new(
-                a.Id,
-                a.Title,
-                a.Content,
-                a.CreatedAt,
-                a.UpdatedAt,
-                a.AuthorId,
+                a.Id, a.Title, a.Content, a.CreatedAt, a.UpdatedAt, a.AuthorId,
                 $"{a.Author?.FirstName} {a.Author?.LastName}".Trim(),
                 a.Tags.Select(t => t.Name).ToList(),
                 a.Comments?.Count ?? 0

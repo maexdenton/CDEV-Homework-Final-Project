@@ -42,7 +42,6 @@ namespace Blog.Web.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            // Передаем регистрацию в BLL-сервис (там автоматически создается роль "Пользователь" и хэшируется пароль)
             var dto = new RegisterUserDto
             {
                 FirstName = model.FirstName,
@@ -52,16 +51,17 @@ namespace Blog.Web.Controllers
                 ConfirmPassword = model.ConfirmPassword
             };
 
-            var (succeeded, error, userDto) = await _userService.RegisterAsync(dto);
+            // Вызов BLL: сервис возвращает типизированный ServiceResult<UserDto>
+            var result = await _userService.RegisterAsync(dto);
 
-            if (!succeeded)
+            if (!result.Succeeded)
             {
-                ModelState.AddModelError(string.Empty, error ?? "Ошибка при регистрации.");
+                ModelState.AddModelError(string.Empty, result.Message ?? "Ошибка при регистрации.");
                 return View(model);
             }
 
-            // Автоматический вход после успешной регистрации
-            var user = await _userManager.FindByIdAsync(userDto!.Id);
+            // Автоматический вход под созданной учетной записью
+            var user = await _userManager.FindByIdAsync(result.Data!.Id);
             if (user != null)
             {
                 await _signInManager.SignInAsync(user, isPersistent: false);
@@ -111,6 +111,12 @@ namespace Blog.Web.Controllers
         {
             await _signInManager.SignOutAsync();
             return RedirectToAction("Index", "Home");
+        }
+
+        [HttpGet]
+        public IActionResult AccessDenied()
+        {
+            return View();
         }
     }
 }

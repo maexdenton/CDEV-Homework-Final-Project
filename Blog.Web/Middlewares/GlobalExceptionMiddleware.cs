@@ -44,7 +44,8 @@ namespace Blog.Web.Middlewares
             }
             else
             {
-                context.Response.Redirect("/Article/Index");
+                // Исправлено: перенаправляем на существующую главную страницу
+                context.Response.Redirect("/");
             }
         }
     }

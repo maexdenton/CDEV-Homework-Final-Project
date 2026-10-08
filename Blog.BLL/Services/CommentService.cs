@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Blog.BLL.DTOs;
+using Blog.BLL.Security;
 using Blog.DAL.Entities;
 using Blog.DAL.Repositories;
 
@@ -21,19 +22,16 @@ namespace Blog.BLL.Services
             _articleRepo = articleRepo;
         }
 
-        public async Task<(bool Succeeded, string? Error, CommentDto? Comment)> CreateAsync(CreateCommentDto dto)
+        public async Task<ServiceResult<CommentDto>> CreateAsync(CreateCommentDto dto, string currentUserId)
         {
-            // Проверка существования целевой статьи
             var article = await _articleRepo.GetByIdAsync(dto.ArticleId);
             if (article == null)
-            {
-                return (false, "Статья с указанным идентификатором не существует.", null);
-            }
+                return ServiceResult<CommentDto>.NotFound("Публикация не найдена.");
 
             var comment = new Comment
             {
                 ArticleId = dto.ArticleId,
-                AuthorId = dto.AuthorId,
+                AuthorId = currentUserId, // Защита: автор берется из claims
                 Content = dto.Content.Trim(),
                 CreatedAt = DateTime.UtcNow
             };
@@ -42,27 +40,17 @@ namespace Blog.BLL.Services
             await _commentRepo.SaveChangesAsync();
 
             var created = await _commentRepo.GetWithDetailsByIdAsync(comment.Id);
-            var commentDto = new CommentDto(
-                created!.Id,
-                created.ArticleId,
-                created.Content,
-                created.CreatedAt,
-                created.AuthorId,
-                $"{created.Author.FirstName} {created.Author.LastName}".Trim()
-            );
-
-            return (true, null, commentDto);
+            return ServiceResult<CommentDto>.Ok(new CommentDto(
+                created!.Id, created.ArticleId, created.Content, created.CreatedAt,
+                created.AuthorId, $"{created.Author.FirstName} {created.Author.LastName}".Trim()
+            ));
         }
 
         public async Task<IEnumerable<CommentDto>> GetAllAsync()
         {
             var comments = await _commentRepo.GetAllWithDetailsAsync();
             return comments.Select(c => new CommentDto(
-                c.Id,
-                c.ArticleId,
-                c.Content,
-                c.CreatedAt,
-                c.AuthorId,
+                c.Id, c.ArticleId, c.Content, c.CreatedAt, c.AuthorId,
                 $"{c.Author.FirstName} {c.Author.LastName}".Trim()
             ));
         }
@@ -73,34 +61,40 @@ namespace Blog.BLL.Services
             if (c == null) return null;
 
             return new CommentDto(
-                c.Id,
-                c.ArticleId,
-                c.Content,
-                c.CreatedAt,
-                c.AuthorId,
+                c.Id, c.ArticleId, c.Content, c.CreatedAt, c.AuthorId,
                 $"{c.Author.FirstName} {c.Author.LastName}".Trim()
             );
         }
 
-        public async Task<bool> UpdateAsync(int id, UpdateCommentDto dto)
+        public async Task<ServiceResult> UpdateAsync(int id, UpdateCommentDto dto, string currentUserId, bool isElevated)
         {
             var comment = await _commentRepo.GetByIdAsync(id);
-            if (comment == null) return false;
+            if (comment == null)
+                return ServiceResult.NotFound("Комментарий не найден.");
+
+            // Владелец, Модератор или Администратор
+            if (comment.AuthorId != currentUserId && !isElevated)
+                return ServiceResult.Forbidden("Вы можете редактировать только собственные комментарии.");
 
             comment.Content = dto.Content.Trim();
             _commentRepo.Update(comment);
             await _commentRepo.SaveChangesAsync();
-            return true;
+            return ServiceResult.Ok();
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<ServiceResult> DeleteAsync(int id, string currentUserId, bool isElevated)
         {
             var comment = await _commentRepo.GetByIdAsync(id);
-            if (comment == null) return false;
+            if (comment == null)
+                return ServiceResult.NotFound("Комментарий не найден.");
+
+            // Владелец, Модератор или Администратор
+            if (comment.AuthorId != currentUserId && !isElevated)
+                return ServiceResult.Forbidden("Вы не имеете права удалять данный комментарий.");
 
             _commentRepo.Delete(comment);
             await _commentRepo.SaveChangesAsync();
-            return true;
+            return ServiceResult.Ok();
         }
     }
 }

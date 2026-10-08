@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Blog.BLL.DTOs;
+using Blog.BLL.Security;
 
 namespace Blog.BLL.Services
 {
@@ -10,10 +11,10 @@ namespace Blog.BLL.Services
     /// </summary>
     public interface ICommentService
     {
-        Task<(bool Succeeded, string? Error, CommentDto? Comment)> CreateAsync(CreateCommentDto dto);
+        Task<ServiceResult<CommentDto>> CreateAsync(CreateCommentDto dto, string currentUserId);
         Task<IEnumerable<CommentDto>> GetAllAsync();
         Task<CommentDto?> GetByIdAsync(int id);
-        Task<bool> UpdateAsync(int id, UpdateCommentDto dto);
-        Task<bool> DeleteAsync(int id);
+        Task<ServiceResult> UpdateAsync(int id, UpdateCommentDto dto, string currentUserId, bool isElevated);
+        Task<ServiceResult> DeleteAsync(int id, string currentUserId, bool isElevated);
     }
 }

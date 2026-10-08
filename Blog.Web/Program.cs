@@ -1,7 +1,9 @@
+using Blog.BLL.Security;
 using Blog.BLL.Services;
 using Blog.DAL;
 using Blog.DAL.Entities;
 using Blog.DAL.Repositories;
+using Blog.Web.Data;
 using Blog.Web.Middlewares;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -15,9 +17,9 @@ namespace Blog.Web
             var builder = WebApplication.CreateBuilder(args);
 
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Строка подключения 'DefaultConnection' не найдена.");
+                ?? throw new InvalidOperationException("Строка 'DefaultConnection' не найдена.");
 
-            // Регистрация DAL: Контекст БД и Репозитории
+            // Data Access Layer
             builder.Services.AddDbContext<BlogDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
@@ -25,13 +27,13 @@ namespace Blog.Web
             builder.Services.AddScoped<ITagRepository, TagRepository>();
             builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 
-            // Регистрация BLL: Бизнес-сервисы
+            // Business Logic Layer
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IArticleService, ArticleService>();
             builder.Services.AddScoped<ITagService, TagService>();
             builder.Services.AddScoped<ICommentService, CommentService>();
 
-            // Настройка Identity
+            // ASP.NET Core Identity
             builder.Services.AddIdentity<User, IdentityRole>(options =>
             {
                 options.Password.RequireDigit = false;
@@ -43,20 +45,29 @@ namespace Blog.Web
             .AddEntityFrameworkStores<BlogDbContext>()
             .AddDefaultTokenProviders();
 
+            // Регистрация динамических политик авторизации на базе Claims
+            builder.Services.AddAuthorization(options =>
+            {
+                // Для каждого permission создается политика, проверяющая наличие соответствующего claim
+                foreach (var permission in AppPermissions.All)
+                {
+                    options.AddPolicy(permission, policy =>
+                        policy.RequireClaim("permission", permission));
+                }
+            });
+
             builder.Services.ConfigureApplicationCookie(options =>
             {
                 options.LoginPath = "/Account/Login";
                 options.AccessDeniedPath = "/Account/AccessDenied";
             });
 
-            // Поддержка MVC-представлений (Razor) и API-контроллеров
             builder.Services.AddControllersWithViews();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
-            // Глобальная обработка ошибок
             app.UseMiddleware<GlobalExceptionMiddleware>();
 
             if (app.Environment.IsDevelopment())
@@ -66,32 +77,24 @@ namespace Blog.Web
             }
 
             app.UseHttpsRedirection();
-            app.UseStaticFiles(); // Разрешаем раздачу css/js/стилей
+            app.UseStaticFiles();
 
             app.UseRouting();
 
+            // Обязательный порядок Middlewares безопасности
             app.UseAuthentication();
             app.UseAuthorization();
 
-            // Маршрут по умолчанию - открывает главную страницу блога при старте
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
 
-            // Подключение маршрутов REST API ([Route("api/[controller]")])
             app.MapControllers();
 
-            // Автоматическое применение миграций и создание роли "Пользователь"
+            // Инициализация схемы данных, ролей, claims и пользователей
             using (var scope = app.Services.CreateScope())
             {
-                var context = scope.ServiceProvider.GetRequiredService<BlogDbContext>();
-                await context.Database.MigrateAsync();
-
-                var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-                if (!await roleManager.RoleExistsAsync("Пользователь"))
-                {
-                    await roleManager.CreateAsync(new IdentityRole("Пользователь"));
-                }
+                await DbInitializer.InitializeAsync(scope.ServiceProvider);
             }
 
             await app.RunAsync();

@@ -33,6 +33,9 @@ namespace Blog.BLL.DTOs
     public record TagDto(
         int Id,
         string Name,
+        string? CreatorId,
         int ArticlesCount
     );
+
+
 }

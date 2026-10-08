@@ -9,25 +9,46 @@ namespace Blog.DAL.Repositories
     public class TagRepository : ITagRepository
     {
         private readonly BlogDbContext _context;
-        public TagRepository(BlogDbContext context) => _context = context;
 
-        public async Task<IEnumerable<Tag>> GetAllAsync() => await _context.Tags.ToListAsync();
-        public async Task<Tag?> GetByIdAsync(int id) => await _context.Tags.FindAsync(id);
+        public TagRepository(BlogDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<IEnumerable<Tag>> GetAllAsync() =>
+            await _context.Tags.Include(t => t.Articles).Include(t => t.Creator).AsNoTracking().ToListAsync();
+
+        public async Task<Tag?> GetByIdAsync(int id) =>
+            await _context.Tags.Include(t => t.Articles).Include(t => t.Creator).FirstOrDefaultAsync(t => t.Id == id);
+
         public async Task<Tag?> GetByNameAsync(string name) =>
             await _context.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
 
-        public async Task<List<Tag>> GetOrCreateTagsAsync(IEnumerable<string> tagNames)
+        public async Task<List<Tag>> GetOrCreateTagsAsync(IEnumerable<string> tagNames, string? creatorId = null)
         {
-            var cleanNames = tagNames.Select(t => t.Trim().ToLower()).Where(t => !string.IsNullOrEmpty(t)).Distinct().ToList();
-            var existing = await _context.Tags.Where(t => cleanNames.Contains(t.Name.ToLower())).ToListAsync();
-            var toCreate = cleanNames.Except(existing.Select(e => e.Name.ToLower())).Select(n => new Tag { Name = n }).ToList();
+            var cleanNames = tagNames
+                .Select(t => t.Trim().ToLower())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Distinct()
+                .ToList();
 
-            if (toCreate.Any())
+            var existing = await _context.Tags.Where(t => cleanNames.Contains(t.Name.ToLower())).ToListAsync();
+            var missingNames = cleanNames.Except(existing.Select(e => e.Name.ToLower())).ToList();
+
+            var createdTags = new List<Tag>();
+            foreach (var name in missingNames)
             {
-                await _context.Tags.AddRangeAsync(toCreate);
+                var tag = new Tag { Name = name, CreatorId = creatorId };
+                createdTags.Add(tag);
+            }
+
+            if (createdTags.Any())
+            {
+                await _context.Tags.AddRangeAsync(createdTags);
                 await _context.SaveChangesAsync();
             }
-            return existing.Concat(toCreate).ToList();
+
+            return existing.Concat(createdTags).ToList();
         }
 
         public async Task AddAsync(Tag entity) => await _context.Tags.AddAsync(entity);

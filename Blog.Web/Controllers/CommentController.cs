@@ -1,5 +1,7 @@
 ﻿using Blog.BLL.DTOs;
+using Blog.BLL.Security;
 using Blog.BLL.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
@@ -7,10 +9,9 @@ namespace Blog.Web.Controllers
     /// <summary>
     /// Контроллер комментариев к статьям блога
     /// </summary>
-    [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    public class CommentController : ControllerBase
+    public class CommentController : BaseApiController
     {
         private readonly ICommentService _commentService;
 
@@ -19,83 +20,49 @@ namespace Blog.Web.Controllers
             _commentService = commentService;
         }
 
-        /// <summary>
-        /// Создание нового комментария к статье
-        /// </summary>
-        [HttpPost]
-        [ProducesResponseType(typeof(CommentDto), StatusCodes.Status201Created)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Create([FromBody] CreateCommentDto dto)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var (succeeded, error, comment) = await _commentService.CreateAsync(dto);
-            if (!succeeded)
-                return NotFound(new { message = error });
-
-            return CreatedAtAction(nameof(GetById), new { id = comment!.Id }, comment);
-        }
-
-        /// <summary>
-        /// Получение списка всех комментариев
-        /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(IEnumerable<CommentDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll()
-        {
-            var comments = await _commentService.GetAllAsync();
-            return Ok(comments);
-        }
+        [AllowAnonymous]
+        public async Task<IActionResult> GetAll() => Ok(await _commentService.GetAllAsync());
 
-        /// <summary>
-        /// Получение комментария по его идентификатору
-        /// </summary>
         [HttpGet("{id:int}")]
-        [ProducesResponseType(typeof(CommentDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById(int id)
         {
             var comment = await _commentService.GetByIdAsync(id);
-            if (comment == null)
-                return NotFound(new { message = $"Комментарий с ID={id} не найден." });
-
-            return Ok(comment);
+            return comment == null ? NotFound(new { message = "Комментарий не найден." }) : Ok(comment);
         }
 
         /// <summary>
-        /// Редактирование текста существующего комментария
+        /// Создание комментария. Автор извлекается из Claims текущей сессии
+        /// </summary>
+        [HttpPost]
+        [Authorize(Policy = AppPermissions.CommentsCreate)]
+        public async Task<IActionResult> Create([FromBody] CreateCommentDto dto)
+        {
+            var result = await _commentService.CreateAsync(dto, CurrentUserId);
+            return ToActionResult(result, comment => CreatedAtAction(nameof(GetById), new { id = comment.Id }, comment));
+        }
+
+        /// <summary>
+        /// Редактирование комментария. Доступно автору комментария, Модератору и Администратору
         /// </summary>
         [HttpPut("{id:int}")]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Authorize(Policy = AppPermissions.CommentsUpdate)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCommentDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var updated = await _commentService.UpdateAsync(id, dto);
-            if (!updated)
-                return NotFound(new { message = $"Комментарий с ID={id} не найден." });
-
-            return NoContent();
+            var result = await _commentService.UpdateAsync(id, dto, CurrentUserId, IsElevatedUser);
+            return ToActionResult(result);
         }
 
         /// <summary>
-        /// Удаление комментария по его идентификатору
+        /// Удаление комментария. Доступно автору комментария, Модератору и Администратору
         /// </summary>
         [HttpDelete("{id:int}")]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Authorize(Policy = AppPermissions.CommentsDelete)]
         public async Task<IActionResult> Delete(int id)
         {
-            var deleted = await _commentService.DeleteAsync(id);
-            if (!deleted)
-                return NotFound(new { message = $"Комментарий с ID={id} не найден." });
-
-            return NoContent();
+            var result = await _commentService.DeleteAsync(id, CurrentUserId, IsElevatedUser);
+            return ToActionResult(result);
         }
     }
 }

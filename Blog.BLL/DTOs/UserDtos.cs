@@ -63,4 +63,13 @@ namespace Blog.BLL.DTOs
         DateTime RegisteredAt,
         IEnumerable<string> Roles
     );
+
+    /// <summary>
+    /// DTO для изменения роли
+    /// </summary>
+    public class ChangeUserRoleDto
+    {
+        [Required(ErrorMessage = "Имя роли обязательно")]
+        public string RoleName { get; set; } = string.Empty;
+    }
 }

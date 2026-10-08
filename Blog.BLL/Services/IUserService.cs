@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Blog.BLL.DTOs;
+using Blog.BLL.Security;
 
 namespace Blog.BLL.Services
 {
@@ -13,7 +14,7 @@ namespace Blog.BLL.Services
         /// <summary>
         /// Регистрирует нового пользователя с автоматическим присвоением роли "Пользователь" (пароль хэшируется алгоритмом Identity (PBKDF2))
         /// </summary>
-        Task<(bool Succeeded, string? Error, UserDto? User)> RegisterAsync(RegisterUserDto dto);
+        Task<ServiceResult<UserDto>> RegisterAsync(RegisterUserDto dto);
 
         /// <summary>
         /// Возвращает всех зарегистрированных пользователей
@@ -23,16 +24,21 @@ namespace Blog.BLL.Services
         /// <summary>
         /// Возвращает профиль пользователя по его идентификатору
         /// </summary>
-        Task<UserDto?> GetByIdAsync(string id);
+        Task<ServiceResult<UserDto>> GetByIdAsync(string id, string currentUserId, bool isAdmin);
 
         /// <summary>
         /// Обновляет личные данные пользователя
         /// </summary>
-        Task<bool> UpdateAsync(string id, UpdateUserDto dto);
+        Task<ServiceResult> UpdateAsync(string id, UpdateUserDto dto, string currentUserId, bool isAdmin);
 
         /// <summary>
         /// Удаляет пользователя и безопасно обрабатывает его зависимые данные
         /// </summary>
-        Task<bool> DeleteAsync(string id);
+        Task<ServiceResult> DeleteAsync(string id, string currentUserId, bool isAdmin);
+
+        /// <summary>
+        /// Измененяет роли пользователя
+        /// </summary>
+        Task<ServiceResult> ChangeUserRoleAsync(string id, string newRole);
     }
 }
