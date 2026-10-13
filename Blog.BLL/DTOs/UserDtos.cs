@@ -27,6 +27,8 @@ namespace Blog.BLL.DTOs
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "Подтверждение пароля обязательно")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть длиной не менее 6 символов")]
         [Compare(nameof(Password), ErrorMessage = "Пароли не совпадают")]
         [DataType(DataType.Password)]
         public string ConfirmPassword { get; set; } = string.Empty;
