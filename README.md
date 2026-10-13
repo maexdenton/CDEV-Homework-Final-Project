@@ -106,8 +106,7 @@ Blog3Tier/
     │   └── launchSettings.json
     ├── ViewModels/
     │   ├── AccountViewModels.cs
-    │   ├── ArticleViewModels.cs
-    │   └── ErrorViewModel.cs
+    │   └── ArticleViewModels.cs
     ├── Views/
     │   ├── Account/
     │   │   ├── Login.cshtml
