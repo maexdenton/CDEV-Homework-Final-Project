@@ -131,12 +131,14 @@ Blog3Tier/
 ## 🚀 Запуск проекта
 
 ### 1. Клонировать репозиторий:
+
 ```bash
 git clone https://github.com/maexdenton/CDEV-Homework-Final-Project.git
 cd CDEV-Homework-Final-Project/Blog3Tier
 ```
 
 ### 2. Проверить строку подключения в `Blog.Web/appsettings.json`:
+
 ```json
 "ConnectionStrings": {
   "DefaultConnection": "Server=.\\SQLEXPRESS;Database=Blog3TierDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
@@ -144,6 +146,7 @@ cd CDEV-Homework-Final-Project/Blog3Tier
 ```
 
 ### 3. Собрать и запустить проект:
+
 ```bash
 dotnet build
 dotnet run --project Blog.Web
@@ -152,19 +155,19 @@ dotnet run --project Blog.Web
 
 ---
 
-## Предустановленные учетные записи
+## 👥 Предустановленные учетные записи
 
 - Администратор: admin@blog.local / Admin123!
 - Модератор: moderator@blog.local / Moderator123!
 
-## Адреса в браузере
+## 🔗 Адреса в браузере
 
 - Веб-интерфейс: https://localhost:7133/
 - Swagger UI: https://localhost:7133/swagger
 
 ---
 
-## Матрица доступа
+## 🔐 Матрица доступа
 
 | Роль              | Статьи и комментарии                               | Теги                                     | Пользователи и роли                        |
 | ----------------- | -------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
@@ -173,7 +176,7 @@ dotnet run --project Blog.Web
 | **Пользователь**  | Создание, редактирование/удаление **только своих** | Редактирование/удаление **только своих** | Только свой профиль                        |
 | **Гость**         | Только просмотр                                    | Только просмотр                          | Регистрация и вход                         |
 
-## Основные API-маршруты
+## 🛣️ Основные API-маршруты
 
 | Метод                                   | Описание                                       |
 | --------------------------------------- | ---------------------------------------------- |
@@ -185,7 +188,8 @@ dotnet run --project Blog.Web
 
 ---
 
-## Миграции EF Core
+## 🗃️ Миграции EF Core
+
 ```bash
 # Добавление миграции
 dotnet ef migrations add <Name> --project Blog.DAL --startup-project Blog.Web
@@ -193,3 +197,30 @@ dotnet ef migrations add <Name> --project Blog.DAL --startup-project Blog.Web
 # Применение миграции вручную
 dotnet ef database update --project Blog.DAL --startup-project Blog.Web
 ```
+---
+
+## 🆘 Диагностика и устранение неполадок
+
+### `SqlException: Cannot open database requested by the login`
+
+- Убедитесь, что служба SQL Server (`MSSQL$SQLEXPRESS`) запущена в диспетчере служб Windows.
+- Проверьте корректность имени инстанса в строке подключения `DefaultConnection`.
+
+### `SqlException (1785): Introducing FOREIGN KEY constraint may cause cycles or multiple cascade paths`
+
+- Конфигурация внешних ключей в `CommentConfiguration.cs` настроена с `DeleteBehavior.Restrict` для связи комментария с пользователем.
+- Убедитесь, что миграции не переопределяют данное поведение.
+
+### `InvalidOperationException: The following sections have been defined but have not been rendered... 'Scripts'`
+
+- Убедитесь, что в конце файла `_Layout.cshtml` присутствует директива:
+
+```cshtml
+@await RenderSectionAsync("Scripts", required: false)
+```
+
+### Ошибки `401 Unauthorized` / `403 Forbidden` в API
+
+- `401 Unauthorized` означает отсутствие сессионной Cookie или заголовка аутентификации.
+- `403 Forbidden` сигнализирует о попытке изменить чужой ресурс без обладания ролью «Модератор» или «Администратор».
+
