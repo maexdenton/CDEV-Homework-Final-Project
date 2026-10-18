@@ -24,29 +24,33 @@ namespace Blog.Web.Middlewares
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Критический сбой выполнения запроса к {Path}", context.Request.Path);
-                await HandleExceptionAsync(context, ex);
+
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    await HandleApiExceptionAsync(context, ex);
+                }
+                else
+                {
+                    // Пробрасываем исключение для UseExceptionHandler,
+                    // чтобы сохранить статус-код 500 и показать страницу ошибки.
+                    throw;
+                }
             }
         }
 
-        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private static async Task HandleApiExceptionAsync(HttpContext context, Exception exception)
         {
-            if (context.Request.Path.StartsWithSegments("/api"))
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+
+            var details = new ProblemDetails
             {
-                context.Response.ContentType = "application/json";
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                var details = new ProblemDetails
-                {
-                    Status = context.Response.StatusCode,
-                    Title = "Ошибка сервера",
-                    Detail = exception.Message
-                };
-                await context.Response.WriteAsync(JsonSerializer.Serialize(details));
-            }
-            else
-            {
-                // Исправлено: перенаправляем на существующую главную страницу
-                context.Response.Redirect("/");
-            }
+                Status = context.Response.StatusCode,
+                Title = "Ошибка сервера",
+                Detail = exception.Message
+            };
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(details));
         }
     }
 }

@@ -1,0 +1,21 @@
+﻿@model Blog.Web.ViewModels.UserDeleteViewModel
+@{
+    ViewData["Title"] = "Удаление пользователя";
+}
+
+<div class="container mt-4">
+    <h2 class="text-danger">Удаление пользователя</h2>
+    <h3>Вы уверены, что хотите удалить этого пользователя?</h3>
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="card mb-3">
+        <div class="card-body">
+            <p class="card-text"><strong>Email:</strong> @Model.Email</p>
+            <p class="card-text"><strong>Имя:</strong> @Model.FirstName @Model.LastName</p>
+        </div>
+    </div>
+    <form asp-action="Delete">
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn btn-danger">Удалить</button>
+        <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>

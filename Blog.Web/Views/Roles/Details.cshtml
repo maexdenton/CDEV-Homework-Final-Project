@@ -1,0 +1,50 @@
+﻿@using Blog.BLL.Security
+@model Blog.Web.ViewModels.RoleListViewModel
+@{
+    ViewData["Title"] = "Детали роли";
+    
+    // Определяем, является ли роль системной
+    bool isSystemRole = Model.Name == AppRoles.Administrator || 
+                        Model.Name == AppRoles.Moderator || 
+                        Model.Name == AppRoles.User;
+
+    // Формируем описание в зависимости от роли
+    string description = Model.Name switch
+    {
+        AppRoles.Administrator => "Полный доступ ко всем разделам системы. Управляет пользователями, назначает роли и имеет права на любые действия с контентом.",
+        AppRoles.Moderator => "Расширенные права на управление контентом. Может редактировать и удалять статьи и комментарии пользователей, но не имеет доступа к управлению учетными записями.",
+        AppRoles.User => "Базовые права. Может создавать собственные статьи, оставлять комментарии и редактировать свой личный профиль.",
+        _ => "Пользовательская роль. Права доступа определяются настройками системы."
+    };
+}
+
+<div class="container mt-4">
+    <h2>Детали роли</h2>
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h4 class="card-title text-primary mb-3">
+                @Model.Name
+                @if (isSystemRole)
+                {
+                    <span class="badge bg-secondary fs-6 align-middle ms-2">Системная</span>
+                }
+            </h4>
+            
+            <p class="card-text text-muted mb-4">
+                @description
+            </p>
+            
+            <hr />
+            
+            <div class="d-flex gap-2">
+                @if (!isSystemRole)
+                {
+                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">Изменить</a>
+                }
+                <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+            </div>
+        </div>
+    </div>
+</div>

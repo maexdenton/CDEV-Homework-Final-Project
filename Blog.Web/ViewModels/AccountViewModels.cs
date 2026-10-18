@@ -2,6 +2,7 @@
 
 namespace Blog.Web.ViewModels
 {
+    // Модель для формы регистрации
     public class RegisterViewModel
     {
         [Required(ErrorMessage = "Имя обязательно для заполнения")]
@@ -23,7 +24,7 @@ namespace Blog.Web.ViewModels
         [Display(Name = "Пароль")]
         public string Password { get; set; } = string.Empty;
 
-        // Идентичный тип, ограничения длины и валидация, дополненные Compare
+        // Идентичный тип, ограничения длины и валидация, дополненные сравнения
         [Required(ErrorMessage = "Подтверждение пароля обязательно")]
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть длиной не менее 6 символов")]
         [DataType(DataType.Password)]
@@ -32,6 +33,7 @@ namespace Blog.Web.ViewModels
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
+    // Модель для формы входа
     public class LoginViewModel
     {
         [Required(ErrorMessage = "Email обязателен")]
@@ -41,5 +43,26 @@ namespace Blog.Web.ViewModels
         [Required(ErrorMessage = "Пароль обязателен")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
+    }
+
+    // Модель для формы смены пароля
+    public class ChangePasswordViewModel
+    {
+        [Required(ErrorMessage = "Введите текущий пароль")]
+        [DataType(DataType.Password)]
+        [Display(Name = "Текущий пароль")]
+        public string CurrentPassword { get; set; } = null!;
+
+        [Required(ErrorMessage = "Введите новый пароль")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть длиной не менее 6 символов")]
+        [DataType(DataType.Password)]
+        [Display(Name = "Новый пароль")]
+        public string NewPassword { get; set; } = null!;
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Подтверждение нового пароля")]
+        // Проверка совпадения с новым паролем
+        [Compare("NewPassword", ErrorMessage = "Новый пароль и его подтверждение не совпадают")]
+        public string ConfirmPassword { get; set; } = null!;
     }
 }

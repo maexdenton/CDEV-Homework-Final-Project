@@ -2,6 +2,7 @@
 using Blog.BLL.Services;
 using Blog.DAL.Entities;
 using Blog.Web.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -104,6 +105,57 @@ namespace Blog.Web.Controllers
             ModelState.AddModelError(string.Empty, "Неверный адрес электронной почты или пароль.");
             return View(model);
         }
+
+
+        // GET: /Account/ChangePassword
+        // Доступно только авторизованным пользователям
+        [Authorize]
+        public IActionResult ChangePassword()
+        {
+            return View();
+        }
+
+        // POST: /Account/ChangePassword
+        [Authorize]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var changePasswordResult = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+
+            if (!changePasswordResult.Succeeded)
+            {
+                foreach (var error in changePasswordResult.Errors)
+                {
+                    // Перехватываем стандартную ошибку Identity и заменяем ее на понятное сообщение 
+                    if (error.Code == "PasswordMismatch")
+                    {
+                        ModelState.AddModelError(string.Empty, "Неверный текущий пароль");
+                    }
+                    else
+                    {
+                        ModelState.AddModelError(string.Empty, error.Description);
+                    }
+                }
+                return View(model);
+            }
+
+            await _signInManager.RefreshSignInAsync(user);
+            TempData["SuccessMessage"] = "Ваш пароль был успешно изменен.";
+            return RedirectToAction("Index", "Home");
+        }
+
 
         [HttpPost]
         [ValidateAntiForgeryToken]

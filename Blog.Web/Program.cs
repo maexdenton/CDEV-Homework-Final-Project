@@ -15,23 +15,21 @@ namespace Blog.Web
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException("Строка 'DefaultConnection' не найдена.");
 
             // Data Access Layer
             builder.Services.AddDbContext<BlogDbContext>(options =>
                 options.UseSqlServer(connectionString));
-
             builder.Services.AddScoped<IArticleRepository, ArticleRepository>();
-            builder.Services.AddScoped<ITagRepository, TagRepository>();
             builder.Services.AddScoped<ICommentRepository, CommentRepository>();
+            builder.Services.AddScoped<ITagRepository, TagRepository>();
 
             // Business Logic Layer
-            builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IArticleService, ArticleService>();
-            builder.Services.AddScoped<ITagService, TagService>();
             builder.Services.AddScoped<ICommentService, CommentService>();
+            builder.Services.AddScoped<ITagService, TagService>();
+            builder.Services.AddScoped<IUserService, UserService>();
 
             // ASP.NET Core Identity
             builder.Services.AddIdentity<User, IdentityRole>(options =>
@@ -48,7 +46,6 @@ namespace Blog.Web
             // Регистрация динамических политик авторизации на базе Claims
             builder.Services.AddAuthorization(options =>
             {
-                // Для каждого permission создается политика, проверяющая наличие соответствующего claim
                 foreach (var permission in AppPermissions.All)
                 {
                     options.AddPolicy(permission, policy =>
@@ -59,7 +56,7 @@ namespace Blog.Web
             builder.Services.ConfigureApplicationCookie(options =>
             {
                 options.LoginPath = "/Account/Login";
-                options.AccessDeniedPath = "/Account/AccessDenied";
+                options.AccessDeniedPath = "/Error/403"; // страница «Доступ запрещен»
             });
 
             builder.Services.AddControllersWithViews();
@@ -68,7 +65,13 @@ namespace Blog.Web
 
             var app = builder.Build();
 
+            // Для API: middleware обрабатывает исключения и возвращает JSON.
+            // Для MVC: middleware пробрасывает исключение дальше,
+            // и его перехватывает UseExceptionHandler.
             app.UseMiddleware<GlobalExceptionMiddleware>();
+
+            // Глобальный обработчик исключений для MVC (500)
+            app.UseExceptionHandler("/Error");
 
             if (app.Environment.IsDevelopment())
             {
@@ -78,17 +81,18 @@ namespace Blog.Web
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
-
             app.UseRouting();
 
             // Обязательный порядок Middlewares безопасности
             app.UseAuthentication();
             app.UseAuthorization();
 
+            // Перенаправление на пользовательские страницы для 403 и 404
+            app.UseStatusCodePagesWithReExecute("/Error/{0}");
+
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
-
             app.MapControllers();
 
             // Инициализация схемы данных, ролей, claims и пользователей
