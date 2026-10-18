@@ -2,7 +2,9 @@
 
 namespace Blog.Web.ViewModels
 {
-    // Модель для отображения списка пользователей (только необходимые поля)
+    // Модель для отображения списка пользователей в таблице.
+    // Используется только для чтения, поэтому атрибуты валидации отсутствуют.
+    // Содержит минимальный набор полей, необходимых для идентификации пользователя и его ролей.
     public class UserListViewModel
     {
         public string Id { get; set; } = null!;
@@ -14,22 +16,27 @@ namespace Blog.Web.ViewModels
         public IEnumerable<string> Roles { get; set; } = new List<string>();
     }
 
-    // Модель для детального просмотра профиля
+    // Модель для страницы детального просмотра профиля пользователя.
+    // Дополнена полями, которые не нужны в списке: телефон и дата регистрации.
     public class UserDetailsViewModel
     {
         public string Id { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string FirstName { get; set; } = null!;
         public string LastName { get; set; } = null!;
+        
+        // Телефон необязателен
         public string? PhoneNumber { get; set; }
+
+        // Дата регистрации: отображается в профиле и может использоваться для сортировки
         public DateTime RegisteredAt { get; set; }
         public IEnumerable<string> Roles { get; set; } = new List<string>();
     }
 
-    // Модель для создания нового пользователя
+    // Модель для формы создания нового пользователя.
+    // Содержит поля, которые заполняет администратор: профиль, учетные данные и роли.
     public class UserCreateViewModel
     {
-        // Атрибуты валидации данных для серверной и клиентской проверки
         [Required(ErrorMessage = "Имя обязательно")]
         [StringLength(50, MinimumLength = 2)]
         public string FirstName { get; set; } = null!;
@@ -47,7 +54,8 @@ namespace Blog.Web.ViewModels
         [StringLength(100, MinimumLength = 6)]
         public string Password { get; set; } = null!;
 
-        // Проверка совпадения паролей через атрибут Compare
+        // Подтверждение пароля проверяется атрибутом [Compare].
+        // Это защищает от опечатки при вводе пароля администратором. 
         [Required(ErrorMessage = "Подтверждение пароля обязательно")]
         [DataType(DataType.Password)]
         [Compare(nameof(Password), ErrorMessage = "Пароли не совпадают")]
@@ -55,11 +63,13 @@ namespace Blog.Web.ViewModels
 
         // Выбранные роли при создании (чекбоксы)
         public List<string> SelectedRoles { get; set; } = new List<string>();
+
         // Все доступные роли для отрисовки чекбоксов
         public IEnumerable<string> AllRoles { get; set; } = new List<string>();
     }
 
-    // Модель для редактирования пользователя
+    // Модель для формы редактирования пользователя.
+    // В отличие от создания, здесь нет полей пароля (смена пароля - отдельный сценарий).
     public class UserEditViewModel
     {
         public string Id { get; set; } = null!;
@@ -80,7 +90,7 @@ namespace Blog.Web.ViewModels
         public IEnumerable<string> AllRoles { get; set; } = new List<string>();
     }
 
-    // Модель для подтверждения удаления
+    // Модель страницы подтверждения удаления пользователя 
     public class UserDeleteViewModel
     {
         public string Id { get; set; } = null!;

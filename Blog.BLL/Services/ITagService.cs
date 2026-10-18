@@ -6,9 +6,7 @@ using Blog.BLL.Security;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Контракт сервиса управления тегами публикаций
-    /// </summary>
+    // Контракт сервиса управления тегами публикаций
     public interface ITagService
     {
         Task<ServiceResult<TagDto>> CreateAsync(CreateTagDto dto, string currentUserId);

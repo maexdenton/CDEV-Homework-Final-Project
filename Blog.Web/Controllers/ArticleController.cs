@@ -6,9 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
 {
-    /// <summary>
-    /// Контроллер публикаций. Обеспечивает полный CRUD статей, поиск и выборку по автору
-    /// </summary>
+    // Контроллер публикаций. Обеспечивает полный CRUD статей, поиск и выборку по автору
     [Route("api/[controller]")]
     [Produces("application/json")]
     public class ArticleController : BaseApiController
@@ -38,9 +36,7 @@ namespace Blog.Web.Controllers
         public async Task<IActionResult> GetByAuthor(string authorId) =>
             Ok(await _articleService.GetByAuthorIdAsync(authorId));
 
-        /// <summary>
-        /// Создание статьи. Требуется право Articles.Create
-        /// </summary>
+        // Создание статьи. Требуется право Articles.Create
         [HttpPost]
         [Authorize(Policy = AppPermissions.ArticlesCreate)]
         [ProducesResponseType(typeof(ArticleDto), StatusCodes.Status201Created)]
@@ -51,9 +47,7 @@ namespace Blog.Web.Controllers
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
-        /// <summary>
-        /// Редактирование статьи. Доступно автору, Модератору и Администратору
-        /// </summary>
+        // Редактирование статьи. Доступно автору, Модератору и Администратору
         [HttpPut("{id:int}")]
         [Authorize(Policy = AppPermissions.ArticlesUpdate)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateArticleDto dto)
@@ -62,9 +56,7 @@ namespace Blog.Web.Controllers
             return ToActionResult(result);
         }
 
-        /// <summary>
-        /// Удаление статьи. Доступно автору, Модератору и Администратору
-        /// </summary>
+        // Удаление статьи. Доступно автору, Модератору и Администратору
         [HttpDelete("{id:int}")]
         [Authorize(Policy = AppPermissions.ArticlesDelete)]
         public async Task<IActionResult> Delete(int id)

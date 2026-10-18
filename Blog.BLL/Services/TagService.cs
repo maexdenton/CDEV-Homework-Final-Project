@@ -9,9 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Сервис бизнес-логики управления тегами
-    /// </summary>
+    // Сервис бизнес-логики управления тегами
     public class TagService : ITagService
     {
         private readonly ITagRepository _tagRepo;
@@ -55,7 +53,7 @@ namespace Blog.BLL.Services
             if (tag == null)
                 return ServiceResult.NotFound("Тег не найден.");
 
-            // Модератор НЕ имеет права редактировать теги. Только создатель тега или Администратор
+            // Модератор НЕ имеет права редактировать теги, только создатель тега или Администратор
             if (tag.CreatorId != currentUserId && !isAdmin)
                 return ServiceResult.Forbidden("Вы можете редактировать только теги собственного авторства.");
 
@@ -76,7 +74,7 @@ namespace Blog.BLL.Services
             if (tag == null)
                 return ServiceResult.NotFound("Тег не найден.");
 
-            // Модератор НЕ имеет права удалять теги. Только создатель или Администратор
+            // Модератор НЕ имеет права удалять теги, только создатель или Администратор
             if (tag.CreatorId != currentUserId && !isAdmin)
                 return ServiceResult.Forbidden("Вы можете удалять только теги собственного авторства.");
 

@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Blog.DAL.Entities
 {
+    // Сущность "Пользователь". Расширяет стандартный IdentityUser 
+    // дополнительными полями профиля (имя, фамилия, дата регистрации) 
+    // и навигационными свойствами для связей с контентом блога.
     public class User : IdentityUser
     {
         public string FirstName { get; set; } = string.Empty;

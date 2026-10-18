@@ -4,6 +4,8 @@ using System.Text;
 
 namespace Blog.DAL.Entities
 {
+    // Сущность "Комментарий". Представляет отзыв, оставленный пользователем под конкретной статьей.
+    // Правила валидации и связи с таблицами настраиваются в CommentConfiguration (Fluent API).
     public class Comment
     {
         public int Id { get; set; }

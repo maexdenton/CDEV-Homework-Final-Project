@@ -8,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Blog.Web.Controllers
 {
-    // [Authorize] с политикой гарантирует, что контроллер доступен только тем, 
-    // у кого есть соответствующие права (в нашем случае - Администратор).
-    // Это автоматически защищает все методы внутри контроллера
+    // Контроллер управления пользователями через MVC-интерфейс (не API).
+    // Политика RolesManage проверяется до входа в любой метод, поэтому все действия внутри защищены на уровне класса, а не отдельных экшенов.
+    // Это исключает риск забыть атрибут на новом методе.
     [Authorize(Policy = AppPermissions.RolesManage)]
     public class UsersController : Controller
     {
@@ -25,7 +25,7 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Users
-        // Отображает список всех пользователей
+        // Отображает список всех пользователей с их ролями
         public async Task<IActionResult> Index()
         {
             // Получаем всех пользователей из БД
@@ -53,7 +53,7 @@ namespace Blog.Web.Controllers
         // Просмотр детальной информации о пользователе
         public async Task<IActionResult> Details(string id)
         {
-            // Проверка, передан ли ID
+            // Проверка на null защищает от запроса /Users/Details без параметра
             if (id == null) return NotFound();
 
             // Поиск пользователя по ID. Если не найден - возвращаем 404
@@ -79,7 +79,7 @@ namespace Blog.Web.Controllers
         // Отображение формы создания пользователя
         public async Task<IActionResult> Create()
         {
-            // Загружаем список всех ролей, чтобы админ мог сразу их назначить
+            // Список всех ролей загружается заранее, чтобы админ мог назначить их сразу при создании, не переходя на страницу редактирования
             var model = new UserCreateViewModel
             {
                 AllRoles = await GetRolesAsync()
@@ -90,7 +90,7 @@ namespace Blog.Web.Controllers
         // POST: Users/Create
         // Обработка отправки формы создания
         [HttpPost]
-        [ValidateAntiForgeryToken] // Защита от CSRF-атак
+        [ValidateAntiForgeryToken] // Защита от CSRF: без токена запрос будет отклонен
         public async Task<IActionResult> Create(UserCreateViewModel model)
         {
             if (ModelState.IsValid) // Проверка валидности введенных данных
@@ -98,18 +98,21 @@ namespace Blog.Web.Controllers
                 // Создаем сущность пользователя
                 var user = new User
                 {
-                    UserName = model.Email, // В качестве логина используем Email
+                    // В качестве логина используется Email — стандартная практика для Identity,
+                    // т.к. Email уникален и привычен пользователю
+                    UserName = model.Email,
                     Email = model.Email,
                     FirstName = model.FirstName,
                     LastName = model.LastName,
                     RegisteredAt = DateTime.UtcNow
                 };
 
-                // Сохраняем пользователя в БД с хешированием пароля
+                // CreateAsync хеширует пароль и сохраняет пользователя в БД
                 var result = await _userManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
-                    // Если роли были выбраны, назначаем их пользователю
+                    // Роли назначаются только после успешного создания пользователя,
+                    // чтобы не оставлять осиротевшие записи в промежуточной таблице
                     if (model.SelectedRoles.Any())
                     {
                         await _userManager.AddToRolesAsync(user, model.SelectedRoles);
@@ -158,6 +161,7 @@ namespace Blog.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(string id, UserEditViewModel model)
         {
+            // Проверка на подмену ID: маршрут и тело формы должны ссылаться на одного пользователя
             if (id != model.Id) return NotFound();
 
             if (ModelState.IsValid)
@@ -173,7 +177,8 @@ namespace Blog.Web.Controllers
                 var result = await _userManager.UpdateAsync(user);
                 if (result.Succeeded)
                 {
-                    // ... логика обновления ролей ...
+                    // Логика обновления ролей (добавление/удаление) вырезана в текущей версии.
+                    // При необходимости ее можно будет восстановить, сравнив текущие и выбранные роли.
                     return RedirectToAction(nameof(Index));
                 }
                 // ...
@@ -210,8 +215,9 @@ namespace Blog.Web.Controllers
             var user = await _userManager.FindByIdAsync(id);
             if (user != null)
             {
-                // ВАЖНО: Защита от удаления самого себя. 
-                // Если текущий авторизованный пользователь пытается удалить свой же аккаунт - блокируем
+                // Критическая защита: администратор не может удалить самого себя.
+                // Без этой проверки можно случайно заблокировать единственный админский аккаунт
+                // и потерять доступ к управлению системой. 
                 var currentUserId = _userManager.GetUserId(User);
                 if (user.Id == currentUserId)
                 {
@@ -231,7 +237,8 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Вспомогательный метод для получения списка названий всех ролей
+        // Вспомогательный метод для получения названий всех ролей.
+        // Вынесен, чтобы не дублировать запрос в Create (GET/POST) и Edit (GET/POST).
         private async Task<IEnumerable<string>> GetRolesAsync()
         {
             return await _roleManager.Roles.Select(r => r.Name!).ToListAsync();

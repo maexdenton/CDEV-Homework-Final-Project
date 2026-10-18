@@ -8,15 +8,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
 {
-    /// <summary>
-    /// Контроллер аутентификации и регистрации для веб-интерфейса (MVC)
-    /// </summary>
+    // MVC-контроллер для аутентификации и управления учетной записью
     public class AccountController : Controller
     {
         private readonly IUserService _userService;
         private readonly SignInManager<User> _signInManager;
         private readonly UserManager<User> _userManager;
 
+        // Зависимости внедряются через DI
         public AccountController(
             IUserService userService,
             SignInManager<User> signInManager,
@@ -27,6 +26,8 @@ namespace Blog.Web.Controllers
             _userManager = userManager;
         }
 
+        // GET: /Account/Register
+        // Если пользователь уже авторизован, форма регистрации не нужна — сразу идем на главную
         [HttpGet]
         public IActionResult Register()
         {
@@ -36,6 +37,9 @@ namespace Blog.Web.Controllers
             return View();
         }
 
+        // POST: /Account/Register
+        // Вся валидация и создание пользователя вынесены в BLL.
+        // Контроллер только маппит ViewModel -> DTO и обрабатывает результат.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model)
@@ -61,7 +65,8 @@ namespace Blog.Web.Controllers
                 return View(model);
             }
 
-            // Автоматический вход под созданной учетной записью
+            // После успешной регистрации сразу выполняем вход,
+            // чтобы пользователю не пришлось вводить credentials повторно
             var user = await _userManager.FindByIdAsync(result.Data!.Id);
             if (user != null)
             {
@@ -71,6 +76,9 @@ namespace Blog.Web.Controllers
             return RedirectToAction("Index", "Home");
         }
 
+        // GET: /Account/Login
+        // returnUrl сохраняется в ViewData, чтобы форма могла передать его обратно
+        // после успешного входа (например, при редиректе из [Authorize]-метода) 
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
@@ -81,6 +89,7 @@ namespace Blog.Web.Controllers
             return View();
         }
 
+        // POST: /Account/Login
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
@@ -88,6 +97,9 @@ namespace Blog.Web.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
+            // lockoutOnFailure: false — временно отключена блокировка аккаунта
+            // после нескольких неудачных попыток. Если понадобится защита от брутфорса,
+            // это поведение можно изменить в настройках Identity (если когда-нибудь понадобится)
             var result = await _signInManager.PasswordSignInAsync(
                 model.Email,
                 model.Password,
@@ -96,6 +108,7 @@ namespace Blog.Web.Controllers
 
             if (result.Succeeded)
             {
+                // Безопасность: проверка Url.IsLocalUrl защищает от open redirect
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     return Redirect(returnUrl);
 
@@ -129,6 +142,7 @@ namespace Blog.Web.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
             {
+                // Пользователь удален или Cookie устарел - отправляем на повторный вход
                 return RedirectToAction("Login", "Account");
             }
 
@@ -138,7 +152,8 @@ namespace Blog.Web.Controllers
             {
                 foreach (var error in changePasswordResult.Errors)
                 {
-                    // Перехватываем стандартную ошибку Identity и заменяем ее на понятное сообщение 
+                    // Перехватываем стандартную ошибку Identity и заменяем ее на понятное сообщение,
+                    // остальные ошибки (например, несоответствие политике паролей) выводим как есть 
                     if (error.Code == "PasswordMismatch")
                     {
                         ModelState.AddModelError(string.Empty, "Неверный текущий пароль");
@@ -151,12 +166,19 @@ namespace Blog.Web.Controllers
                 return View(model);
             }
 
+            // Обновляем Security Stamp в Cookie, чтобы сессия осталась валидной
+            // после смены пароля. Без этого пользователя может выкинуть из системы
+            // при следующей проверке безопасности 
             await _signInManager.RefreshSignInAsync(user);
             TempData["SuccessMessage"] = "Ваш пароль был успешно изменен.";
             return RedirectToAction("Index", "Home");
         }
 
 
+        // POST: /Account/Logout
+        // Выход выполняется только через POST с antiforgery-токеном,
+        // чтобы предотвратить CSRF-атаки, при которых злоумышленник может
+        // разлогинить пользователя через скрытую форму или изображение
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
@@ -165,6 +187,9 @@ namespace Blog.Web.Controllers
             return RedirectToAction("Index", "Home");
         }
 
+        // GET: /Account/AccessDenied
+        // Вызывается middleware авторизации, когда пользователь аутентифицирован,
+        // но у него нет прав на запрошенный ресурс (HTTP 403) 
         [HttpGet]
         public IActionResult AccessDenied()
         {

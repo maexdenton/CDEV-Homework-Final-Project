@@ -5,9 +5,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
-    /// <summary>
-    /// DTO создания новой метки
-    /// </summary>
+    // DTO создания новой метки
     public class CreateTagDto
     {
         [Required(ErrorMessage = "Имя тега обязательно")]
@@ -16,9 +14,7 @@ namespace Blog.BLL.DTOs
         public string Name { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// DTO редактирования тега
-    /// </summary>
+    // DTO редактирования тега
     public class UpdateTagDto
     {
         [Required(ErrorMessage = "Имя тега обязательно")]
@@ -27,9 +23,7 @@ namespace Blog.BLL.DTOs
         public string Name { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// DTO информации о теге
-    /// </summary>
+    // DTO информации о теге
     public record TagDto(
         int Id,
         string Name,

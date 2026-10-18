@@ -5,19 +5,13 @@ using System.Text;
 
 namespace Blog.DAL.Repositories
 {
-    /// <summary>
-    /// Контракт репозитория для работы с комментариями
-    /// </summary>
+    // Интерфейс репозитория для управления сущностями "Комментарий"
     public interface ICommentRepository : IRepository<Comment>
     {
-        /// <summary>
-        /// Возвращает все комментарии с подгруженными данными об авторах и статьях
-        /// </summary>
+        // Возвращает все комментарии с подгруженными данными об авторах и статьях
         Task<IEnumerable<Comment>> GetAllWithDetailsAsync();
 
-        /// <summary>
-        /// Возвращает комментарий по идентификатору с загрузкой автора
-        /// </summary>
+        // Возвращает комментарий по идентификатору с загрузкой автора
         Task<Comment?> GetWithDetailsByIdAsync(int id);
     }
 }

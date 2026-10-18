@@ -6,9 +6,7 @@ using Blog.BLL.Security;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Контракт сервиса управления комментариями
-    /// </summary>
+    // Контракт сервиса управления комментариями
     public interface ICommentService
     {
         Task<ServiceResult<CommentDto>> CreateAsync(CreateCommentDto dto, string currentUserId);

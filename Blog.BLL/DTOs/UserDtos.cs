@@ -5,9 +5,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
-    /// <summary>
-    /// DTO для регистрации новой учетной записи
-    /// </summary>
+    // DTO для регистрации новой учетной записи
     public class RegisterUserDto
     {
         [Required(ErrorMessage = "Имя обязательно для заполнения")]
@@ -34,10 +32,8 @@ namespace Blog.BLL.DTOs
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// DTO для редактирования профиля пользователя.
-    /// Исключает прямое изменение пароля и прав через этот контракт
-    /// </summary>
+    // DTO для редактирования профиля пользователя.
+    // Исключает прямое изменение пароля и прав через этот контракт.
     public class UpdateUserDto
     {
         [Required(ErrorMessage = "Имя обязательно для заполнения")]
@@ -52,10 +48,8 @@ namespace Blog.BLL.DTOs
         public string? PhoneNumber { get; set; }
     }
 
-    /// <summary>
-    /// DTO для отображения информации о пользователе.
-    /// Не содержит чувствительных данных (хэшей паролей, секретных ключей)
-    /// </summary>
+    // DTO для отображения информации о пользователе.
+    // Не содержит чувствительных данных (хэшей паролей, секретных ключей).
     public record UserDto(
         string Id,
         string Email,
@@ -66,9 +60,7 @@ namespace Blog.BLL.DTOs
         IEnumerable<string> Roles
     );
 
-    /// <summary>
-    /// DTO для изменения роли
-    /// </summary>
+    // DTO для изменения роли
     public class ChangeUserRoleDto
     {
         [Required(ErrorMessage = "Имя роли обязательно")]

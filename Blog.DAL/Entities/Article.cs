@@ -4,6 +4,8 @@ using System.Text;
 
 namespace Blog.DAL.Entities
 {
+    // Основная сущность предметной области, представляющая публикацию в блоге.
+    // Связи с другими таблицами (Автор, Теги, Комментарии) настраиваются через Fluent API.
     public class Article
     {
         public int Id { get; set; }

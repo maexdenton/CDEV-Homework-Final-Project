@@ -3,11 +3,12 @@ using Blog.BLL.DTOs;
 
 namespace Blog.Web.ViewModels
 {
-    /// <summary>
-    /// Модель представления для формы редактирования статьи
-    /// </summary>
+    // Модель представления для формы редактирования статьи.
+    // Содержит поля, которые пользователь может изменить (заголовок, текст, теги), 
+    // и правила валидации для них. Идентификатор статьи передается скрытым полем.
     public class ArticleEditViewModel
     {
+        // Идентификатор редактируемой статьи
         public int Id { get; set; }
 
         [Required(ErrorMessage = "Заголовок обязателен для заполнения")]
@@ -20,6 +21,7 @@ namespace Blog.Web.ViewModels
         [Display(Name = "Текст публикации")]
         public string Content { get; set; } = string.Empty;
 
+        // Теги вводятся одной строкой через запятую, контроллер разбивает их на список
         [Display(Name = "Теги (через запятую)")]
         public string Tags { get; set; } = string.Empty;
     }

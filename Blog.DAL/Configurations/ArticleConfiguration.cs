@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Blog.DAL.Configurations
 {
+    // Конфигурация Fluent API для сущности "Статья".
+    // Определяет ограничения полей и правила связей с другими таблицами.
     public class ArticleConfiguration : IEntityTypeConfiguration<Article>
     {
         public void Configure(EntityTypeBuilder<Article> builder)

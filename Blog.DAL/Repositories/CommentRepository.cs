@@ -6,9 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Blog.DAL.Repositories
 {
-    /// <summary>
-    /// Репозиторий доступа к данным комментариев
-    /// </summary>
+    // Репозиторий для работы с сущностями "Комментарий".
+    // Инкапсулирует операции чтения и записи комментариев в БД.
     public class CommentRepository : ICommentRepository
     {
         private readonly BlogDbContext _context;

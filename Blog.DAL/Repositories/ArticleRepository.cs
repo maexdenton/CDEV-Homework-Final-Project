@@ -6,9 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Blog.DAL.Repositories
 {
-    /// <summary>
-    /// Репозиторий доступа к данным статей в базе данных SQL Server
-    /// </summary>
+    // Репозиторий для работы с сущностями "Статья". 
+    // Инкапсулирует все операции чтения и записи в БД для этой сущности.
     public class ArticleRepository : IArticleRepository
     {
         private readonly BlogDbContext _context;

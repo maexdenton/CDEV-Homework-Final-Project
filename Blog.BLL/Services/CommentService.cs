@@ -8,9 +8,7 @@ using Blog.DAL.Repositories;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Сервис бизнес-логики управления комментариями
-    /// </summary>
+    // Сервис бизнес-логики управления комментариями
     public class CommentService : ICommentService
     {
         private readonly ICommentRepository _commentRepo;
@@ -31,7 +29,7 @@ namespace Blog.BLL.Services
             var comment = new Comment
             {
                 ArticleId = dto.ArticleId,
-                AuthorId = currentUserId, // Защита: автор берется из claims
+                AuthorId = currentUserId, // Защита: автор берется из Сlaims
                 Content = dto.Content.Trim(),
                 CreatedAt = DateTime.UtcNow
             };

@@ -6,39 +6,25 @@ using Blog.BLL.Security;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Контракт сервиса управления учетными записями пользователей
-    /// </summary>
+    // Контракт сервиса управления учетными записями пользователей
     public interface IUserService
     {
-        /// <summary>
-        /// Регистрирует нового пользователя с автоматическим присвоением роли "Пользователь" (пароль хэшируется алгоритмом Identity (PBKDF2))
-        /// </summary>
+        // Регистрирует нового пользователя с автоматическим присвоением роли "Пользователь" (пароль хэшируется алгоритмом Identity (PBKDF2))
         Task<ServiceResult<UserDto>> RegisterAsync(RegisterUserDto dto);
 
-        /// <summary>
-        /// Возвращает всех зарегистрированных пользователей
-        /// </summary>
+        // Возвращает всех зарегистрированных пользователей
         Task<IEnumerable<UserDto>> GetAllAsync();
 
-        /// <summary>
-        /// Возвращает профиль пользователя по его идентификатору
-        /// </summary>
+        // Возвращает профиль пользователя по его идентификатору
         Task<ServiceResult<UserDto>> GetByIdAsync(string id, string currentUserId, bool isAdmin);
 
-        /// <summary>
-        /// Обновляет личные данные пользователя
-        /// </summary>
+        // Обновляет личные данные пользователя
         Task<ServiceResult> UpdateAsync(string id, UpdateUserDto dto, string currentUserId, bool isAdmin);
 
-        /// <summary>
-        /// Удаляет пользователя и безопасно обрабатывает его зависимые данные
-        /// </summary>
+        // Удаляет пользователя и безопасно обрабатывает его зависимые данные
         Task<ServiceResult> DeleteAsync(string id, string currentUserId, bool isAdmin);
 
-        /// <summary>
-        /// Измененяет роли пользователя
-        /// </summary>
+        // Измененяет роли пользователя
         Task<ServiceResult> ChangeUserRoleAsync(string id, string newRole);
     }
 }

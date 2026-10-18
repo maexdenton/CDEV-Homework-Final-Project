@@ -5,6 +5,8 @@ using System.Linq.Expressions;
 
 namespace Blog.DAL.Repositories
 {
+    // Базовый (generic) интерфейс репозитория.
+    // Обеспечивает стандартные CRUD-операции для любой сущности.
     public interface IRepository<T> where T : class
     {
         Task<IEnumerable<T>> GetAllAsync();

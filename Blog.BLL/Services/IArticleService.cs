@@ -6,9 +6,7 @@ using Blog.BLL.Security;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Контракт сервиса управления статьями блога
-    /// </summary>
+    // Контракт сервиса управления статьями блога
     public interface IArticleService
     {
         Task<ArticleDto> CreateAsync(CreateArticleDto dto, string currentUserId);

@@ -8,23 +8,24 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
 {
-    /// <summary>
-    /// Контроллер веб-интерфейса блога с поддержкой полного жизненного цикла статей и комментариев
-    /// </summary>
+    // MVC-контроллер веб-интерфейса блога.
+    // Отвечает за отображение ленты статей, просмотр, создание, редактирование и удаление публикаций, а также за управление комментариями прямо со страницы статьи.
+    // Вся бизнес-логика (проверка прав, валидация, работа с БД) делегируется в сервисный слой (<see cref="IArticleService"/>, <see cref="ICommentService"/>).
     public class HomeController : Controller
     {
         private readonly IArticleService _articleService;
         private readonly ICommentService _commentService;
 
+        // Сервисы внедряются через DI. Контроллер не работает с DbContext напрямую,
+        // что упрощает тестирование и сохраняет разделение слоев 
         public HomeController(IArticleService articleService, ICommentService commentService)
         {
             _articleService = articleService;
             _commentService = commentService;
         }
 
-        /// <summary>
-        /// Главная страница: вывод ленты статей с фильтрацией по поиску и тегу
-        /// </summary>
+        // Главная страница: лента статей с фильтрацией по поисковому запросу и тегу.
+        // Параметры <paramref name="search"/> и <paramref name="tag"/> передаются в сервис, который применяет соответствующую фильтрацию к запросу.
         [HttpGet]
         public async Task<IActionResult> Index(string? search, string? tag)
         {
@@ -34,9 +35,8 @@ namespace Blog.Web.Controllers
             return View(articles);
         }
 
-        /// <summary>
-        /// Просмотр статьи и комментариев
-        /// </summary>
+        // Просмотр конкретной статьи и всех ее комментариев.
+        // Если статья не найдена — возвращается 404 (страница "Ресурс не найден").
         [HttpGet]
         public async Task<IActionResult> Details(int id)
         {
@@ -46,16 +46,15 @@ namespace Blog.Web.Controllers
             return View(article);
         }
 
-        /// <summary>
-        /// Страница создания новой статьи (только для авторизованных)
-        /// </summary>
+        // Отображение формы создания новой статьи.
+        // Доступно только авторизованным пользователям.
         [Authorize]
         [HttpGet]
         public IActionResult Create() => View();
 
-        /// <summary>
-        /// Обработка отправки формы создания статьи
-        /// </summary>
+        // Обработка отправки формы создания статьи.
+        // Идентификатор автора строго берется из Сlaims текущей сессии, а не из данных формы — это исключает подмену авторства.
+        // Теги, введеные через запятую, разбиваются на список и передаются в сервис.
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -67,10 +66,11 @@ namespace Blog.Web.Controllers
                 return View();
             }
 
-            // Идентификатор автора строго берется из Claims
+            // Автор определяется по аутентифицированному пользователю (строго берется из Claims)
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var tagList = tags?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new List<string>();
 
+            // Пользователь может ввести теги через запятую (пустые и лишние пробелы удаляются)
             var dto = new CreateArticleDto
             {
                 Title = title,
@@ -81,13 +81,14 @@ namespace Blog.Web.Controllers
 
             var created = await _articleService.CreateAsync(dto, userId);
             TempData["SuccessMessage"] = "Статья успешно опубликована!";
+
+            // После создания перенаправляем на страницу просмотра новой статьи
             return RedirectToAction(nameof(Details), new { id = created.Id });
         }
 
-        /// <summary>
-        /// Страница редактирования статьи.
-        /// Доступна автору, модератору и администратору
-        /// </summary>
+        // Страница редактирования статьи.
+        // Доступна автору, модератору и администратору.
+        // Проверка прав выполняется здесь (для отображения формы) и повторно в сервисе (при сохранении), чтобы исключить обход через прямые POST-запросы.
         [Authorize]
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
@@ -96,9 +97,11 @@ namespace Blog.Web.Controllers
             if (article == null) return NotFound();
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+            // Модераторы и администраторы могут редактировать любые статьи
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
-            // Проверка прав на отображение формы
+            // Автор может редактировать только свои статьи, а остальным — 403
             if (article.AuthorId != userId && !isElevated)
             {
                 return Forbid();
@@ -115,9 +118,9 @@ namespace Blog.Web.Controllers
             return View(model);
         }
 
-        /// <summary>
-        /// Обработка сохранения изменений статьи
-        /// </summary>
+        // Обработка сохранения изменений статьи.
+        // Финальная проверка прав выполняется в сервисном слое:
+        // контроллер передает <paramref name="isElevated"/>, а сервис решает, разрешено ли обновление. При отказе возвращается 403.
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -138,7 +141,7 @@ namespace Blog.Web.Controllers
                 Tags = tagList
             };
 
-            // Сервис проверяет права и владение
+            // Сервис проверяет права и владение статьей
             var result = await _articleService.UpdateAsync(id, dto, userId, isElevated);
 
             if (!result.Succeeded)
@@ -152,9 +155,8 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        /// <summary>
-        /// Удаление статьи с проверкой прав на стороне сервиса
-        /// </summary>
+        // Удаление статьи. Проверка прав выполняется на стороне сервиса.
+        // При успехе пользователь возвращается на главную страницу, при ошибке — обратно на страницу статьи с сообщением в TempData.
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -176,9 +178,9 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>
-        /// Добавление комментария к статье
-        /// </summary>
+        // Добавление комментария к статье.
+        // Автор комментария берется из Сlaims, а не из формы.
+        // После добавления пользователь возвращается на страницу статьи.
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -207,9 +209,8 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        /// <summary>
-        /// Редактирование текста комментария прямо на странице статьи
-        /// </summary>
+        // Редактирование текста комментария прямо на странице статьи.
+        // Как и при редактировании статьи, проверка прав делегируется сервису.
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -239,9 +240,8 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        /// <summary>
-        /// Удаление комментария прямо на странице статьи
-        /// </summary>
+        // Удаление комментария прямо на странице статьи.
+        // Проверка прав (автор / модератор / администратор) выполняется в сервисе.
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]

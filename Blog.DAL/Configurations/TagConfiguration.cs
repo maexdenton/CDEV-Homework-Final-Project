@@ -7,9 +7,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Blog.DAL.Configurations
 {
-    /// <summary>
-    /// Fluent API конфигурация ограничений и связей для сущности Tag
-    /// </summary>
+    // Fluent API конфигурация ограничений и связей для сущности Tag
     public class TagConfiguration : IEntityTypeConfiguration<Tag>
     {
         public void Configure(EntityTypeBuilder<Tag> builder)

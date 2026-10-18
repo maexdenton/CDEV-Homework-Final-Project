@@ -5,9 +5,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
-    /// <summary>
-    /// DTO создания статьи
-    /// </summary>
+    // DTO создания статьи
     public class CreateArticleDto
     {
         [Required(ErrorMessage = "Заголовок обязателен")]
@@ -24,9 +22,7 @@ namespace Blog.BLL.DTOs
         public List<string> Tags { get; set; } = new();
     }
 
-    /// <summary>
-    /// DTO редактирования статьи
-    /// </summary>
+    // DTO редактирования статьи
     public class UpdateArticleDto
     {
         [Required(ErrorMessage = "Заголовок обязателен")]
@@ -40,9 +36,7 @@ namespace Blog.BLL.DTOs
         public List<string> Tags { get; set; } = new();
     }
 
-    /// <summary>
-    /// DTO краткого отображения статьи для списков
-    /// </summary>
+    // DTO краткого отображения статьи для списков
     public record ArticleDto(
         int Id,
         string Title,
@@ -55,9 +49,7 @@ namespace Blog.BLL.DTOs
         int CommentsCount
     );
 
-    /// <summary>
-    /// DTO подробного отображения статьи с комментариями
-    /// </summary>
+    // DTO подробного отображения статьи с комментариями
     public record ArticleDetailsDto(
         int Id,
         string Title,

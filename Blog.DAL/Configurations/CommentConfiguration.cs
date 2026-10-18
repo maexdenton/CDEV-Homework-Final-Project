@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Blog.DAL.Configurations
 {
+    // Конфигурация Fluent API для сущности "Комментарий".
+    // Определяет ограничения полей и правила связей с другими таблицами.
     public class CommentConfiguration : IEntityTypeConfiguration<Comment>
     {
         public void Configure(EntityTypeBuilder<Comment> builder)

@@ -2,7 +2,9 @@
 
 namespace Blog.Web.ViewModels
 {
-    // Модель для формы регистрации
+    // Модель для формы регистрации нового пользователя. 
+    // Содержит поля профиля (имя, фамилия) и учетные данные (email, пароль).
+    // Валидация пароля дублируется в ConfirmPassword с атрибутом [Compare], чтобы исключить опечатку при вводе.
     public class RegisterViewModel
     {
         [Required(ErrorMessage = "Имя обязательно для заполнения")]
@@ -24,7 +26,8 @@ namespace Blog.Web.ViewModels
         [Display(Name = "Пароль")]
         public string Password { get; set; } = string.Empty;
 
-        // Идентичный тип, ограничения длины и валидация, дополненные сравнения
+        // Идентичен Password по ограничениям длины и типу данных, 
+        // но дополнен атрибутом [Compare], который проверяет совпадение значений
         [Required(ErrorMessage = "Подтверждение пароля обязательно")]
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть длиной не менее 6 символов")]
         [DataType(DataType.Password)]
@@ -33,7 +36,7 @@ namespace Blog.Web.ViewModels
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    // Модель для формы входа
+    // Модель формы входа: Email используется как логин и обязателен 
     public class LoginViewModel
     {
         [Required(ErrorMessage = "Email обязателен")]
@@ -45,7 +48,8 @@ namespace Blog.Web.ViewModels
         public string Password { get; set; } = string.Empty;
     }
 
-    // Модель для формы смены пароля
+    // Модель смены пароля авторизованным пользователем.
+    // CurrentPassword подтверждает личность перед изменением.
     public class ChangePasswordViewModel
     {
         [Required(ErrorMessage = "Введите текущий пароль")]
@@ -61,6 +65,7 @@ namespace Blog.Web.ViewModels
 
         [DataType(DataType.Password)]
         [Display(Name = "Подтверждение нового пароля")]
+
         // Проверка совпадения с новым паролем
         [Compare("NewPassword", ErrorMessage = "Новый пароль и его подтверждение не совпадают")]
         public string ConfirmPassword { get; set; } = null!;

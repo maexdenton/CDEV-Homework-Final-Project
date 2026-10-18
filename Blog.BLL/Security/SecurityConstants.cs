@@ -4,9 +4,7 @@ using System.Text;
 
 namespace Blog.BLL.Security
 {
-    /// <summary>
-    /// Системные роли приложения
-    /// </summary>
+    // Системные роли приложения
     public static class AppRoles
     {
         public const string Administrator = "Администратор";
@@ -14,9 +12,7 @@ namespace Blog.BLL.Security
         public const string User = "Пользователь";
     }
 
-    /// <summary>
-    /// Детализированные права (Permissions), связываемые через Claims с ролями пользователей
-    /// </summary>
+    // Детализированные права (Permissions), связываемые через Claims с ролями пользователей
     public static class AppPermissions
     {
         public const string UsersView = "Permissions.Users.View";
@@ -41,9 +37,7 @@ namespace Blog.BLL.Security
 
         public const string RolesManage = "Permissions.Roles.Manage";
 
-        /// <summary>
-        /// Полный перечень всех прав в системе для автоматического связывания с ролью Администратора
-        /// </summary>
+        // Полный перечень всех прав в системе для автоматического связывания с ролью Администратора
         public static readonly IReadOnlyList<string> All = new[]
         {
         UsersView, UsersCreate, UsersUpdate, UsersDelete,
@@ -54,9 +48,7 @@ namespace Blog.BLL.Security
     };
     }
 
-    /// <summary>
-    /// Статусы завершения бизнес-операции, исключающие смешивание кодов ошибок в HTTP
-    /// </summary>
+    // Статусы завершения бизнес-операции, исключающие смешивание кодов ошибок в HTTP
     public enum ResultStatus
     {
         Success,
@@ -66,9 +58,7 @@ namespace Blog.BLL.Security
         InvalidData
     }
 
-    /// <summary>
-    /// Универсальная обертка результата бизнес-операции со строгой семантикой
-    /// </summary>
+    // Универсальная обертка результата бизнес-операции со строгой семантикой
     public class ServiceResult
     {
         public bool Succeeded => Status == ResultStatus.Success;
@@ -82,9 +72,7 @@ namespace Blog.BLL.Security
         public static ServiceResult BadRequest(string message) => new() { Status = ResultStatus.InvalidData, Message = message };
     }
 
-    /// <summary>
-    /// Обобщенный результат операции с полезной нагрузкой
-    /// </summary>
+    // Обобщенный результат операции с полезной нагрузкой
     public class ServiceResult<T> : ServiceResult
     {
         public T? Data { get; init; }

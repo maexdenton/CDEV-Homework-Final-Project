@@ -7,18 +7,22 @@ using Blog.Web.ViewModels;
 
 namespace Blog.Web.Controllers
 {
-    // Доступ к управлению ролями строго для администратора
+    // Контроллер управления ролями. 
+    // Доступен только пользователям с правом RolesManage строго для администратора. Политика проверяется до входа в любой метод.
     [Authorize(Policy = AppPermissions.RolesManage)]
     public class RolesController : Controller
     {
         private readonly RoleManager<IdentityRole> _roleManager;
 
+        // Зависимость только от RoleManager, т.к. контроллер работает исключительно с ролями
         public RolesController(RoleManager<IdentityRole> roleManager)
         {
             _roleManager = roleManager;
         }
 
-        // Вспомогательный метод для проверки, является ли роль системной
+        // Проверяет, является ли роль одной из трех предустановленных системных ролей.
+        // Такие роли нельзя переименовывать или удалять, чтобы не сломать логику авторизации,
+        // которая завязана на константы AppRoles.Administrator / Moderator / User.
         private bool IsSystemRole(string roleName)
         {
             return roleName == AppRoles.Administrator ||
@@ -27,6 +31,8 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Roles
+        // Список всех ролей. Вьюха сама решает, показывать ли кнопки редактирования/удаления,
+        // но финальная защита всt равно остаtтся на уровне контроллера (в Edit/Delete).
         public async Task<IActionResult> Index()
         {
             var roles = await _roleManager.Roles.ToListAsync();
@@ -40,6 +46,7 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Roles/Details/5
+        // Детальный просмотр роли. Если роль не найдена — 404
         public async Task<IActionResult> Details(string id)
         {
             if (id == null) return NotFound();
@@ -57,6 +64,9 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Roles/Edit/5
+        // Отображение формы редактирования.
+        // Если роль системная — вместо формы возвращается страница Details с сообщением об ошибке.
+        // Это осознанное решение: пользователь видит детали роли и понимает, почему редактирование недоступно.
         public async Task<IActionResult> Edit(string id)
         {
             if (id == null) return NotFound();
@@ -81,6 +91,8 @@ namespace Blog.Web.Controllers
         }
 
         // POST: Roles/Edit/5
+        // Повторная проверка на системную роль обязательна: злоумышленник может отправить POST напрямую,
+        // минуя GET-форму. Без этой проверки системную роль можно было бы переименовать
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(string id, RoleEditViewModel model)
@@ -115,6 +127,7 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Roles/Delete/5
+        // Аналогично Edit: для системных ролей показываем страницу Details с сообщением, а не форму подтверждения удаления
         public async Task<IActionResult> Delete(string id)
         {
             if (id == null) return NotFound();
@@ -139,6 +152,9 @@ namespace Blog.Web.Controllers
         }
 
         // POST: Roles/Delete/5
+        // Финальная защита от удаления системной роли. Даже если запрос отправлен напрямую,
+        // роль не будет удалена. Дополнительно обрабатываются ошибки Identity (например, если роль
+        // все еще назначена пользователям, Identity может запретить удаление).
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(string id)

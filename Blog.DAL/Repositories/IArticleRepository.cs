@@ -5,20 +5,15 @@ using Blog.DAL.Entities;
 
 namespace Blog.DAL.Repositories
 {
-    /// <summary>
-    /// Контракт репозитория для работы с публикациями блога
-    /// </summary>
+    // Интерфейс репозитория для управления сущностями "Статья"
     public interface IArticleRepository : IRepository<Article>
     {
-        /// <summary>
-        /// Возвращает статьи с фильтрацией по ключевым словам и тегу
-        /// </summary>
+        // Возвращает статьи с фильтрацией по ключевым словам и тегу
         Task<IEnumerable<Article>> GetFilteredAsync(string? search, string? tag);
 
-        /// <summary>
-        /// Возвращает статью по идентификатору с загрузкой автора, тегов и комментариев
-        /// </summary>
+        // Возвращает статью по идентификатору с загрузкой автора, тегов и комментариев
         Task<Article?> GetDetailedByIdAsync(int id);
+
 
         /// <summary>
         /// Возвращает все статьи, опубликованные конкретным автором

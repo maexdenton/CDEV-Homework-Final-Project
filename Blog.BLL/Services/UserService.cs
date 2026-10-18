@@ -9,9 +9,7 @@ using System.Text;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Сервис управления пользователями с проверкой полномочий и предотвращением эскалации привилегий
-    /// </summary>
+    // Сервис управления пользователями с проверкой полномочий и предотвращением эскалации привилегий
     public class UserService : IUserService
     {
         private readonly UserManager<User> _userManager;
@@ -23,9 +21,7 @@ namespace Blog.BLL.Services
             _roleManager = roleManager;
         }
 
-        /// <summary>
-        /// Регистрация нового пользователя с автоматическим присвоением роли "Пользователь"
-        /// </summary>
+        // Регистрация нового пользователя с автоматическим присвоением роли "Пользователь"
         public async Task<ServiceResult<UserDto>> RegisterAsync(RegisterUserDto dto)
         {
             var existingUser = await _userManager.FindByEmailAsync(dto.Email);
@@ -118,9 +114,7 @@ namespace Blog.BLL.Services
             return result.Succeeded ? ServiceResult.Ok() : ServiceResult.BadRequest("Ошибка при удалении пользователя.");
         }
 
-        /// <summary>
-        /// Смена роли пользователя. Доступна только с правом Roles.Manage
-        /// </summary>
+        // Смена роли пользователя. Доступна только с правом Roles.Manage
         public async Task<ServiceResult> ChangeUserRoleAsync(string id, string newRole)
         {
             if (!await _roleManager.RoleExistsAsync(newRole))

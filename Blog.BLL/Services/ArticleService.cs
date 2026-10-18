@@ -8,9 +8,7 @@ using Blog.DAL.Repositories;
 
 namespace Blog.BLL.Services
 {
-    /// <summary>
-    /// Сервис статей с защитой от подмены автора и проверкой владения
-    /// </summary>
+    // Сервис статей с защитой от подмены автора и проверкой владения
     public class ArticleService : IArticleService
     {
         private readonly IArticleRepository _articleRepo;
@@ -24,14 +22,14 @@ namespace Blog.BLL.Services
 
         public async Task<ArticleDto> CreateAsync(CreateArticleDto dto, string currentUserId)
         {
-            // Идентификатор автора жестко привязывается к текущему пользователю из claims
+            // Идентификатор автора жестко привязывается к текущему пользователю из Сlaims
             var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags, currentUserId);
 
             var article = new Article
             {
                 Title = dto.Title.Trim(),
                 Content = dto.Content,
-                AuthorId = currentUserId, // Защита от Over-Posting / подмены автора
+                AuthorId = currentUserId, // Защита от Over-Posting (подмены автора)
                 CreatedAt = DateTime.UtcNow,
                 Tags = tags
             };
