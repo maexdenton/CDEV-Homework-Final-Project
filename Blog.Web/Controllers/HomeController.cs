@@ -5,103 +5,111 @@ using Blog.BLL.Services;
 using Blog.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Blog.Web.Controllers
 {
-    // MVC-контроллер веб-интерфейса блога.
-    // Отвечает за отображение ленты статей, просмотр, создание, редактирование и удаление публикаций, а также за управление комментариями прямо со страницы статьи.
-    // Вся бизнес-логика (проверка прав, валидация, работа с БД) делегируется в сервисный слой (<see cref="IArticleService"/>, <see cref="ICommentService"/>).
+    /// <summary>
+    /// MVC-контроллер веб-интерфейса блога.
+    /// Отвечает за отображение ленты статей, просмотр, создание, редактирование
+    /// и удаление публикаций, а также за управление комментариями прямо со страницы статьи.
+    /// Вся бизнес-логика (проверка прав, валидация, работа с БД) делегируется
+    /// в сервисный слой (<see cref="IArticleService"/>, <see cref="ICommentService"/>).
+    /// </summary>
     public class HomeController : Controller
     {
         private readonly IArticleService _articleService;
         private readonly ICommentService _commentService;
 
-        // Сервисы внедряются через DI. Контроллер не работает с DbContext напрямую,
-        // что упрощает тестирование и сохраняет разделение слоев 
-        public HomeController(IArticleService articleService, ICommentService commentService)
+        // Логгер для фиксации значимых действий пользователя (создание, редактирование и т.д.)
+        private readonly ILogger<HomeController> _logger;
+
+        public HomeController(
+            IArticleService articleService,
+            ICommentService commentService,
+            ILogger<HomeController> logger)
         {
             _articleService = articleService;
             _commentService = commentService;
+            _logger = logger;
         }
 
-        // Главная страница: лента статей с фильтрацией по поисковому запросу и тегу.
-        // Параметры <paramref name="search"/> и <paramref name="tag"/> передаются в сервис, который применяет соответствующую фильтрацию к запросу.
+        /// <summary>
+        /// Главная страница: лента статей с фильтрацией по поисковому запросу и тегу.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> Index(string? search, string? tag)
         {
             ViewData["SearchQuery"] = search;
             ViewData["CurrentTag"] = tag;
+
             var articles = await _articleService.GetAllAsync(search, tag);
             return View(articles);
         }
 
-        // Просмотр конкретной статьи и всех ее комментариев.
-        // Если статья не найдена — возвращается 404 (страница "Ресурс не найден").
+        /// <summary>
+        /// Просмотр конкретной статьи и всех ее комментариев.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> Details(int id)
         {
             var article = await _articleService.GetByIdAsync(id);
-            if (article == null) return NotFound();
+            if (article == null)
+                return NotFound();
 
             return View(article);
         }
 
-        // Отображение формы создания новой статьи.
-        // Доступно только авторизованным пользователям.
+        // GET: /Home/Create
         [Authorize]
         [HttpGet]
-        public IActionResult Create() => View();
+        public IActionResult Create() => View(new ArticleCreateViewModel());
 
-        // Обработка отправки формы создания статьи.
-        // Идентификатор автора строго берется из Сlaims текущей сессии, а не из данных формы — это исключает подмену авторства.
-        // Теги, введеные через запятую, разбиваются на список и передаются в сервис.
+        // POST: /Home/Create
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(string title, string content, string tags)
+        public async Task<IActionResult> Create(ArticleCreateViewModel model)
         {
-            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(content))
-            {
-                ModelState.AddModelError("", "Заголовок и текст обязательны для заполнения.");
-                return View();
-            }
+            if (!ModelState.IsValid)
+                return View(model);
 
-            // Автор определяется по аутентифицированному пользователю (строго берется из Claims)
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var tagList = tags?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new List<string>();
 
-            // Пользователь может ввести теги через запятую (пустые и лишние пробелы удаляются)
+            var tagList = model.Tags?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList() ?? new List<string>();
+
             var dto = new CreateArticleDto
             {
-                Title = title,
-                Content = content,
+                Title = model.Title,
+                Content = model.Content,
                 AuthorId = userId,
                 Tags = tagList
             };
 
             var created = await _articleService.CreateAsync(dto, userId);
-            TempData["SuccessMessage"] = "Статья успешно опубликована!";
 
-            // После создания перенаправляем на страницу просмотра новой статьи
+            // ЛОГИРОВАНИЕ: Создание статьи
+            _logger.LogInformation("User {User} created a new article titled '{Title}'",
+                User.Identity?.Name, model.Title);
+
+            TempData["SuccessMessage"] = "Статья успешно опубликована!";
             return RedirectToAction(nameof(Details), new { id = created.Id });
         }
 
-        // Страница редактирования статьи.
-        // Доступна автору, модератору и администратору.
-        // Проверка прав выполняется здесь (для отображения формы) и повторно в сервисе (при сохранении), чтобы исключить обход через прямые POST-запросы.
+        // GET: /Home/Edit/{id}
         [Authorize]
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
         {
             var article = await _articleService.GetByIdAsync(id);
-            if (article == null) return NotFound();
+            if (article == null)
+                return NotFound();
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-
-            // Модераторы и администраторы могут редактировать любые статьи
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
-            // Автор может редактировать только свои статьи, а остальным — 403
             if (article.AuthorId != userId && !isElevated)
             {
                 return Forbid();
@@ -118,21 +126,30 @@ namespace Blog.Web.Controllers
             return View(model);
         }
 
-        // Обработка сохранения изменений статьи.
-        // Финальная проверка прав выполняется в сервисном слое:
-        // контроллер передает <paramref name="isElevated"/>, а сервис решает, разрешено ли обновление. При отказе возвращается 403.
+        // POST: /Home/Edit/{id}
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, ArticleEditViewModel model)
         {
+            var article = await _articleService.GetByIdAsync(id);
+            if (article == null) return NotFound();
+
+            // Обход валидации для старых данных (если заголовок короче 5 символов, но не менялся)
+            if (article.Title == model.Title && article.Title.Length < 5)
+            {
+                ModelState.Remove(nameof(model.Title));
+            }
+
             if (!ModelState.IsValid)
                 return View(model);
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
-            var tagList = model.Tags?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new List<string>();
+            var tagList = model.Tags?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList() ?? new List<string>();
 
             var dto = new UpdateArticleDto
             {
@@ -141,27 +158,36 @@ namespace Blog.Web.Controllers
                 Tags = tagList
             };
 
-            // Сервис проверяет права и владение статьей
             var result = await _articleService.UpdateAsync(id, dto, userId, isElevated);
 
             if (!result.Succeeded)
             {
-                if (result.Status == ResultStatus.Forbidden) return Forbid();
+                if (result.Status == ResultStatus.Forbidden)
+                    return Forbid();
+
                 ModelState.AddModelError("", result.Message ?? "Не удалось обновить публикацию.");
                 return View(model);
             }
+
+            // ЛОГИРОВАНИЕ: Редактирование статьи (фиксируем, какие именно поля изменились)
+            var changes = new List<string>();
+            if (article.Title != model.Title) changes.Add($"Title: '{article.Title}' -> '{model.Title}'");
+            if (article.Content != model.Content) changes.Add("Content was modified");
+
+            _logger.LogInformation("User {User} edited article '{Title}'. Changes: {Changes}",
+                User.Identity?.Name, model.Title, string.Join("; ", changes));
 
             TempData["SuccessMessage"] = "Статья успешно обновлена.";
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        // Удаление статьи. Проверка прав выполняется на стороне сервиса.
-        // При успехе пользователь возвращается на главную страницу, при ошибке — обратно на страницу статьи с сообщением в TempData.
+        // POST: /Home/DeleteArticle/{id}
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteArticle(int id)
         {
+            var article = await _articleService.GetByIdAsync(id);
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
@@ -169,18 +195,22 @@ namespace Blog.Web.Controllers
 
             if (!result.Succeeded)
             {
-                if (result.Status == ResultStatus.Forbidden) return Forbid();
+                if (result.Status == ResultStatus.Forbidden)
+                    return Forbid();
+
                 TempData["ErrorMessage"] = result.Message ?? "Ошибка при удалении статьи.";
                 return RedirectToAction(nameof(Details), new { id });
             }
+
+            // ЛОГИРОВАНИЕ: Удаление статьи
+            _logger.LogInformation("User {User} deleted article '{Title}'",
+                User.Identity?.Name, article?.Title);
 
             TempData["SuccessMessage"] = "Публикация была успешно удалена.";
             return RedirectToAction(nameof(Index));
         }
 
-        // Добавление комментария к статье.
-        // Автор комментария берется из Сlaims, а не из формы.
-        // После добавления пользователь возвращается на страницу статьи.
+        // POST: /Home/AddComment
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -189,15 +219,22 @@ namespace Blog.Web.Controllers
             if (!string.IsNullOrWhiteSpace(content))
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-                var result = await _commentService.CreateAsync(new CreateCommentDto
-                {
-                    ArticleId = articleId,
-                    AuthorId = userId,
-                    Content = content
-                }, userId);
+
+                var result = await _commentService.CreateAsync(
+                    new CreateCommentDto
+                    {
+                        ArticleId = articleId,
+                        AuthorId = userId,
+                        Content = content
+                    },
+                    userId);
 
                 if (result.Succeeded)
                 {
+                    // ЛОГИРОВАНИЕ: Добавление комментария
+                    _logger.LogInformation("User {User} added a comment to article {ArticleId}. Text: '{Content}'",
+                        User.Identity?.Name, articleId, content);
+
                     TempData["SuccessMessage"] = "Комментарий успешно добавлен.";
                 }
                 else
@@ -209,8 +246,7 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // Редактирование текста комментария прямо на странице статьи.
-        // Как и при редактировании статьи, проверка прав делегируется сервису.
+        // POST: /Home/EditComment
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -222,31 +258,46 @@ namespace Blog.Web.Controllers
                 return RedirectToAction(nameof(Details), new { id = articleId });
             }
 
+            // Получаем старый комментарий до изменений для логирования
+            var oldComment = await _commentService.GetByIdAsync(commentId);
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
-            var result = await _commentService.UpdateAsync(commentId, new UpdateCommentDto { Content = content }, userId, isElevated);
+            var result = await _commentService.UpdateAsync(
+                commentId,
+                new UpdateCommentDto { Content = content },
+                userId,
+                isElevated);
 
             if (!result.Succeeded)
             {
-                if (result.Status == ResultStatus.Forbidden) return Forbid();
+                if (result.Status == ResultStatus.Forbidden)
+                    return Forbid();
+
                 TempData["ErrorMessage"] = result.Message ?? "Не удалось изменить комментарий.";
             }
             else
             {
+                // ЛОГИРОВАНИЕ: Редактирование комментария (старый и новый текст)
+                _logger.LogInformation("User {User} edited comment {CommentId}. Old text: '{OldText}', New text: '{NewText}'",
+                    User.Identity?.Name, commentId, oldComment?.Content, content);
+
                 TempData["SuccessMessage"] = "Комментарий успешно обновлен.";
             }
 
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // Удаление комментария прямо на странице статьи.
-        // Проверка прав (автор / модератор / администратор) выполняется в сервисе.
+        // POST: /Home/DeleteComment
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteComment(int commentId, int articleId)
         {
+            // Получаем комментарий до удаления для логирования
+            var commentToDelete = await _commentService.GetByIdAsync(commentId);
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
@@ -254,11 +305,17 @@ namespace Blog.Web.Controllers
 
             if (!result.Succeeded)
             {
-                if (result.Status == ResultStatus.Forbidden) return Forbid();
+                if (result.Status == ResultStatus.Forbidden)
+                    return Forbid();
+
                 TempData["ErrorMessage"] = result.Message ?? "Не удалось удалить комментарий.";
             }
             else
             {
+                // ЛОГИРОВАНИЕ: Удаление комментария (текст удаляемого комментария)
+                _logger.LogInformation("User {User} deleted comment {CommentId}. Deleted text: '{Content}'",
+                    User.Identity?.Name, commentId, commentToDelete?.Content);
+
                 TempData["SuccessMessage"] = "Комментарий удален.";
             }
 

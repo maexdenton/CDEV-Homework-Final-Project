@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Serilog;
+using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,15 +11,8 @@ namespace Blog.Web.Middlewares
     public class GlobalExceptionMiddleware
     {
         private readonly RequestDelegate _next;
-        private readonly ILogger<GlobalExceptionMiddleware> _logger;
+        public GlobalExceptionMiddleware(RequestDelegate next) => _next = next;
 
-        public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
-        {
-            _next = next;
-            _logger = logger;
-        }
-
-        // Перехватывает исключения из последующего конвейера для каждого HTTP-запроса
         public async Task InvokeAsync(HttpContext context)
         {
             try
@@ -27,21 +21,22 @@ namespace Blog.Web.Middlewares
             }
             catch (Exception ex)
             {
-                // Логируем исключение с указанием пути запроса — это помогает при диагностике 
-                _logger.LogError(ex, "Критический сбой выполнения запроса к {Path}", context.Request.Path);
+                var user = context.User.Identity?.Name ?? "Anonymous";
 
-                // Стратегия зависит от типа запроса:
-                // - для API возвращаем структурированный JSON-ответ;
-                // - для MVC пробрасываем исключение дальше, чтобы UseExceptionHandler сохранил статус-код 500 и отрисовал кастомную страницу ошибки.
+                // Логируем ошибку через Serilog с контекстом
+                Log.Error(ex, "Unhandled exception for {Method} {Path} by {User}. TraceId: {TraceId}",
+                    context.Request.Method,
+                    context.Request.Path,
+                    user,
+                    context.TraceIdentifier);
+
                 if (context.Request.Path.StartsWithSegments("/api"))
                 {
                     await HandleApiExceptionAsync(context, ex);
                 }
                 else
                 {
-                    // Пробрасываем исключение для UseExceptionHandler,
-                    // чтобы сохранить статус-код 500 и показать страницу ошибки.
-                    throw;
+                    throw; // Пробрасываем для UseExceptionHandler (страница 500)
                 }
             }
         }

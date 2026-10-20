@@ -1,9 +1,10 @@
-﻿using System.Security.Claims;
-using Blog.BLL.Security;
+﻿using Blog.BLL.Security;
 using Blog.DAL;
 using Blog.DAL.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+using System.Security.Claims;
 
 namespace Blog.Web.Data
 {
@@ -18,6 +19,9 @@ namespace Blog.Web.Data
         {
             var context = serviceProvider.GetRequiredService<BlogDbContext>();
 
+            Log.Information("Применение миграций базы данных...");
+            await context.Database.MigrateAsync();
+
             // Применяет непримененные миграции EF Core, поддерживая версионирование схемы БД
             await context.Database.MigrateAsync();
 
@@ -31,6 +35,8 @@ namespace Blog.Web.Data
                 if (!await roleManager.RoleExistsAsync(role))
                     await roleManager.CreateAsync(new IdentityRole(role));
             }
+
+            Log.Information("Инициализация базы данных успешно завершена.");
 
             // Назначает роли "Администратор" все разрешения из AppPermissions.All.
             // Claims типа "permission" используются в политиках авторизации; повторное назначение исключено 

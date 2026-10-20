@@ -5,36 +5,39 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Blog.Web.Controllers
 {
-    // Контроллер управления пользователями через MVC-интерфейс (не API).
-    // Политика RolesManage проверяется до входа в любой метод, поэтому все действия внутри защищены на уровне класса, а не отдельных экшенов.
-    // Это исключает риск забыть атрибут на новом методе.
+    // Контроллер управления пользователями через MVC-интерфейс.
+    // Доступен только пользователям с правом RolesManage (Администраторам).
     [Authorize(Policy = AppPermissions.RolesManage)]
     public class UsersController : Controller
     {
         private readonly UserManager<User> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
-        // Внедрение зависимостей через конструктор (DI)
-        public UsersController(UserManager<User> userManager, RoleManager<IdentityRole> roleManager)
+        // Логгер для фиксации действий администратора
+        private readonly ILogger<UsersController> _logger;
+
+        public UsersController(
+            UserManager<User> userManager,
+            RoleManager<IdentityRole> roleManager,
+            ILogger<UsersController> logger)
         {
             _userManager = userManager;
             _roleManager = roleManager;
+            _logger = logger;
         }
 
         // GET: Users
-        // Отображает список всех пользователей с их ролями
         public async Task<IActionResult> Index()
         {
-            // Получаем всех пользователей из БД
             var users = await _userManager.Users.ToListAsync();
             var model = new List<UserListViewModel>();
 
             foreach (var user in users)
             {
-                // Для каждого пользователя запрашиваем его роли
                 var roles = await _userManager.GetRolesAsync(user);
                 model.Add(new UserListViewModel
                 {
@@ -50,13 +53,10 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Users/Details/5
-        // Просмотр детальной информации о пользователе
         public async Task<IActionResult> Details(string id)
         {
-            // Проверка на null защищает от запроса /Users/Details без параметра
             if (id == null) return NotFound();
 
-            // Поиск пользователя по ID. Если не найден - возвращаем 404
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return NotFound();
 
@@ -76,10 +76,8 @@ namespace Blog.Web.Controllers
         }
 
         // GET: Users/Create
-        // Отображение формы создания пользователя
         public async Task<IActionResult> Create()
         {
-            // Список всех ролей загружается заранее, чтобы админ мог назначить их сразу при создании, не переходя на страницу редактирования
             var model = new UserCreateViewModel
             {
                 AllRoles = await GetRolesAsync()
@@ -88,18 +86,14 @@ namespace Blog.Web.Controllers
         }
 
         // POST: Users/Create
-        // Обработка отправки формы создания
         [HttpPost]
-        [ValidateAntiForgeryToken] // Защита от CSRF: без токена запрос будет отклонен
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(UserCreateViewModel model)
         {
-            if (ModelState.IsValid) // Проверка валидности введенных данных
+            if (ModelState.IsValid)
             {
-                // Создаем сущность пользователя
                 var user = new User
                 {
-                    // В качестве логина используется Email — стандартная практика для Identity,
-                    // т.к. Email уникален и привычен пользователю
                     UserName = model.Email,
                     Email = model.Email,
                     FirstName = model.FirstName,
@@ -107,28 +101,41 @@ namespace Blog.Web.Controllers
                     RegisteredAt = DateTime.UtcNow
                 };
 
-                // CreateAsync хеширует пароль и сохраняет пользователя в БД
                 var result = await _userManager.CreateAsync(user, model.Password);
+
                 if (result.Succeeded)
                 {
-                    // Роли назначаются только после успешного создания пользователя,
-                    // чтобы не оставлять осиротевшие записи в промежуточной таблице
+                    var adminName = User.Identity?.Name ?? "Unknown Admin";
+
                     if (model.SelectedRoles.Any())
                     {
-                        await _userManager.AddToRolesAsync(user, model.SelectedRoles);
+                        var roleResult = await _userManager.AddToRolesAsync(user, model.SelectedRoles);
+                        if (roleResult.Succeeded)
+                        {
+                            // Логирование первичной выдачи ролей при создании пользователя
+                            _logger.LogInformation("Admin {Admin} created user {TargetUser} and assigned roles: {Roles}",
+                                adminName, user.Email, string.Join(", ", model.SelectedRoles));
+                        }
+                        else
+                        {
+                            _logger.LogError("Admin {Admin} created user {TargetUser}, but failed to assign roles: {Errors}",
+                                adminName, user.Email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                        }
                     }
+                    else
+                    {
+                        _logger.LogInformation("Admin {Admin} created user {TargetUser} without any roles.", adminName, user.Email);
+                    }
+
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Если Identity вернул ошибки (например, слабый пароль), добавляем их в ModelState
                 foreach (var error in result.Errors)
                 {
                     ModelState.AddModelError(string.Empty, error.Description);
                 }
             }
 
-            // Если дошли сюда, значит были ошибки валидации. 
-            // Заново загружаем роли и возвращаем форму с данными пользователя
             model.AllRoles = await GetRolesAsync();
             return View(model);
         }
@@ -141,7 +148,6 @@ namespace Blog.Web.Controllers
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return NotFound();
 
-            // Получаем текущие роли пользователя, чтобы отметить нужные чекбоксы
             var userRoles = await _userManager.GetRolesAsync(user);
             var model = new UserEditViewModel
             {
@@ -161,7 +167,6 @@ namespace Blog.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(string id, UserEditViewModel model)
         {
-            // Проверка на подмену ID: маршрут и тело формы должны ссылаться на одного пользователя
             if (id != model.Id) return NotFound();
 
             if (ModelState.IsValid)
@@ -177,11 +182,66 @@ namespace Blog.Web.Controllers
                 var result = await _userManager.UpdateAsync(user);
                 if (result.Succeeded)
                 {
-                    // Логика обновления ролей (добавление/удаление) вырезана в текущей версии.
-                    // При необходимости ее можно будет восстановить, сравнив текущие и выбранные роли.
+                    // ВОССТАНОВЛЕННАЯ ЛОГИКА ОБНОВЛЕНИЯ РОЛЕЙ
+                    var adminName = User.Identity?.Name ?? "Unknown Admin";
+                    var currentRoles = await _userManager.GetRolesAsync(user);
+
+                    // Вычисляем, какие роли нужно добавить, а какие удалить
+                    var rolesToAdd = model.SelectedRoles.Except(currentRoles).ToList();
+                    var rolesToRemove = currentRoles.Except(model.SelectedRoles).ToList();
+
+                    // 1. Добавление новых ролей
+                    if (rolesToAdd.Any())
+                    {
+                        var addResult = await _userManager.AddToRolesAsync(user, rolesToAdd);
+                        if (addResult.Succeeded)
+                        {
+                            foreach (var role in rolesToAdd)
+                            {
+                                _logger.LogInformation("Admin {Admin} assigned role {Role} to user {TargetUser}.",
+                                    adminName, role, user.Email);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to add roles to {TargetUser} by Admin {Admin}: {Errors}",
+                                user.Email, adminName, string.Join(", ", addResult.Errors.Select(e => e.Description)));
+                        }
+                    }
+
+                    // 2. Удаление старых ролей
+                    if (rolesToRemove.Any())
+                    {
+                        var removeResult = await _userManager.RemoveFromRolesAsync(user, rolesToRemove);
+                        if (removeResult.Succeeded)
+                        {
+                            foreach (var role in rolesToRemove)
+                            {
+                                _logger.LogInformation("Admin {Admin} removed role {Role} from user {TargetUser}.",
+                                    adminName, role, user.Email);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to remove roles from {TargetUser} by Admin {Admin}: {Errors}",
+                                user.Email, adminName, string.Join(", ", removeResult.Errors.Select(e => e.Description)));
+                        }
+                    }
+
+                    // Если роли не менялись, просто логируем факт редактирования профиля
+                    if (!rolesToAdd.Any() && !rolesToRemove.Any())
+                    {
+                        _logger.LogInformation("Admin {Admin} updated profile of user {TargetUser} (no role changes).",
+                            adminName, user.Email);
+                    }
+
                     return RedirectToAction(nameof(Index));
                 }
-                // ...
+
+                foreach (var error in result.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
             }
 
             model.AllRoles = await GetRolesAsync();
@@ -215,9 +275,7 @@ namespace Blog.Web.Controllers
             var user = await _userManager.FindByIdAsync(id);
             if (user != null)
             {
-                // Критическая защита: администратор не может удалить самого себя.
-                // Без этой проверки можно случайно заблокировать единственный админский аккаунт
-                // и потерять доступ к управлению системой. 
+                // Защита от удаления самого себя
                 var currentUserId = _userManager.GetUserId(User);
                 if (user.Id == currentUserId)
                 {
@@ -232,13 +290,24 @@ namespace Blog.Web.Controllers
                     return View(model);
                 }
 
-                await _userManager.DeleteAsync(user);
+                var adminName = User.Identity?.Name ?? "Unknown Admin";
+                var targetEmail = user.Email;
+
+                var result = await _userManager.DeleteAsync(user);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogInformation("Admin {Admin} deleted user {TargetUser}.", adminName, targetEmail);
+                }
+                else
+                {
+                    _logger.LogError("Admin {Admin} failed to delete user {TargetUser}: {Errors}",
+                        adminName, targetEmail, string.Join(", ", result.Errors.Select(e => e.Description)));
+                }
             }
             return RedirectToAction(nameof(Index));
         }
 
-        // Вспомогательный метод для получения названий всех ролей.
-        // Вынесен, чтобы не дублировать запрос в Create (GET/POST) и Edit (GET/POST).
         private async Task<IEnumerable<string>> GetRolesAsync()
         {
             return await _roleManager.Roles.Select(r => r.Name!).ToListAsync();

@@ -8,26 +8,31 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers
 {
-    // MVC-контроллер для аутентификации и управления учетной записью
+    /// <summary>
+    /// MVC-контроллер для аутентификации и управления учетной записью
+    /// </summary>
     public class AccountController : Controller
     {
         private readonly IUserService _userService;
         private readonly SignInManager<User> _signInManager;
         private readonly UserManager<User> _userManager;
 
-        // Зависимости внедряются через DI
+        // Логгер для фиксации событий безопасности и ошибок входа
+        private readonly ILogger<AccountController> _logger;
+
         public AccountController(
             IUserService userService,
             SignInManager<User> signInManager,
-            UserManager<User> userManager)
+            UserManager<User> userManager,
+            ILogger<AccountController> logger)
         {
             _userService = userService;
             _signInManager = signInManager;
             _userManager = userManager;
+            _logger = logger;
         }
 
         // GET: /Account/Register
-        // Если пользователь уже авторизован, форма регистрации не нужна — сразу идем на главную
         [HttpGet]
         public IActionResult Register()
         {
@@ -38,8 +43,6 @@ namespace Blog.Web.Controllers
         }
 
         // POST: /Account/Register
-        // Вся валидация и создание пользователя вынесены в BLL.
-        // Контроллер только маппит ViewModel -> DTO и обрабатывает результат.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model)
@@ -56,29 +59,29 @@ namespace Blog.Web.Controllers
                 ConfirmPassword = model.ConfirmPassword
             };
 
-            // Вызов BLL: сервис возвращает типизированный ServiceResult<UserDto>
             var result = await _userService.RegisterAsync(dto);
 
             if (!result.Succeeded)
             {
+                // Ошибки бизнес-логики (например, email уже занят) логируем как Warning
+                _logger.LogWarning("Registration failed for {Email}. Reason: {Reason}",
+                    model.Email, result.Message ?? "Unknown error");
+
                 ModelState.AddModelError(string.Empty, result.Message ?? "Ошибка при регистрации.");
                 return View(model);
             }
 
-            // После успешной регистрации сразу выполняем вход,
-            // чтобы пользователю не пришлось вводить credentials повторно
             var user = await _userManager.FindByIdAsync(result.Data!.Id);
             if (user != null)
             {
                 await _signInManager.SignInAsync(user, isPersistent: false);
             }
 
+            _logger.LogInformation("New user registered successfully: {Email}", model.Email);
             return RedirectToAction("Index", "Home");
         }
 
         // GET: /Account/Login
-        // returnUrl сохраняется в ViewData, чтобы форма могла передать его обратно
-        // после успешного входа (например, при редиректе из [Authorize]-метода) 
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
@@ -97,9 +100,6 @@ namespace Blog.Web.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            // lockoutOnFailure: false — временно отключена блокировка аккаунта
-            // после нескольких неудачных попыток. Если понадобится защита от брутфорса,
-            // это поведение можно изменить в настройках Identity (если когда-нибудь понадобится)
             var result = await _signInManager.PasswordSignInAsync(
                 model.Email,
                 model.Password,
@@ -108,20 +108,22 @@ namespace Blog.Web.Controllers
 
             if (result.Succeeded)
             {
-                // Безопасность: проверка Url.IsLocalUrl защищает от open redirect
+                _logger.LogInformation("User {Email} logged in successfully.", model.Email);
+
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     return Redirect(returnUrl);
 
                 return RedirectToAction("Index", "Home");
             }
 
+            // ЛОГИРОВАНИЕ ОШИБКИ АВТОРИЗАЦИИ (согласно требованию - уровень Error)
+            _logger.LogError("Failed login attempt for email {Email}. Invalid credentials.", model.Email);
+
             ModelState.AddModelError(string.Empty, "Неверный адрес электронной почты или пароль.");
             return View(model);
         }
 
-
         // GET: /Account/ChangePassword
-        // Доступно только авторизованным пользователям
         [Authorize]
         public IActionResult ChangePassword()
         {
@@ -135,61 +137,58 @@ namespace Blog.Web.Controllers
         public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
         {
             if (!ModelState.IsValid)
-            {
                 return View(model);
-            }
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
             {
-                // Пользователь удален или Cookie устарел - отправляем на повторный вход
                 return RedirectToAction("Login", "Account");
             }
 
-            var changePasswordResult = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+            var changePasswordResult = await _userManager.ChangePasswordAsync(
+                user,
+                model.CurrentPassword,
+                model.NewPassword);
 
             if (!changePasswordResult.Succeeded)
             {
                 foreach (var error in changePasswordResult.Errors)
                 {
-                    // Перехватываем стандартную ошибку Identity и заменяем ее на понятное сообщение,
-                    // остальные ошибки (например, несоответствие политике паролей) выводим как есть 
                     if (error.Code == "PasswordMismatch")
                     {
+                        // Неверный текущий пароль - логируем как Warning (ошибка пользователя)
+                        _logger.LogWarning("Failed password change attempt for user {Email}. Incorrect current password.", user.Email);
                         ModelState.AddModelError(string.Empty, "Неверный текущий пароль");
                     }
                     else
                     {
+                        _logger.LogWarning("Failed password change for user {Email}. Error: {Error}", user.Email, error.Description);
                         ModelState.AddModelError(string.Empty, error.Description);
                     }
                 }
                 return View(model);
             }
 
-            // Обновляем Security Stamp в Cookie, чтобы сессия осталась валидной
-            // после смены пароля. Без этого пользователя может выкинуть из системы
-            // при следующей проверке безопасности 
             await _signInManager.RefreshSignInAsync(user);
+
+            _logger.LogInformation("User {Email} successfully changed their password.", user.Email);
             TempData["SuccessMessage"] = "Ваш пароль был успешно изменен.";
             return RedirectToAction("Index", "Home");
         }
 
-
         // POST: /Account/Logout
-        // Выход выполняется только через POST с antiforgery-токеном,
-        // чтобы предотвратить CSRF-атаки, при которых злоумышленник может
-        // разлогинить пользователя через скрытую форму или изображение
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
+            var userEmail = User.Identity?.Name;
             await _signInManager.SignOutAsync();
+
+            _logger.LogInformation("User {Email} logged out.", userEmail);
             return RedirectToAction("Index", "Home");
         }
 
         // GET: /Account/AccessDenied
-        // Вызывается middleware авторизации, когда пользователь аутентифицирован,
-        // но у него нет прав на запрошенный ресурс (HTTP 403) 
         [HttpGet]
         public IActionResult AccessDenied()
         {
