@@ -1,14 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
+using System.Threading.Tasks;
 using Blog.BLL.DTOs;
-using Blog.BLL.Security;
 using Blog.DAL.Entities;
 using Blog.DAL.Repositories;
 
 namespace Blog.BLL.Services
 {
-    // Сервис статей с защитой от подмены автора и проверкой владения
+    /// <summary>
+    /// Сервис для работы со статьями с проверкой прав владения и защитой от подмены автора.
+    /// </summary>
     public class ArticleService : IArticleService
     {
         private readonly IArticleRepository _articleRepo;
@@ -22,21 +24,23 @@ namespace Blog.BLL.Services
 
         public async Task<ArticleDto> CreateAsync(CreateArticleDto dto, string currentUserId)
         {
-            // Идентификатор автора жестко привязывается к текущему пользователю из Сlaims
+            // Автор всегда берется из claims, чтобы исключить подмену через DTO.
             var tags = await _tagRepo.GetOrCreateTagsAsync(dto.Tags, currentUserId);
 
             var article = new Article
             {
                 Title = dto.Title.Trim(),
                 Content = dto.Content,
-                AuthorId = currentUserId, // Защита от Over-Posting (подмены автора)
+                AuthorId = currentUserId,
                 CreatedAt = DateTime.UtcNow,
-                Tags = tags
+                Tags = tags.ToList()
             };
 
             await _articleRepo.AddAsync(article);
             await _articleRepo.SaveChangesAsync();
 
+            // Перечитываем со связями (Author + Tags), чтобы сформировать ArticleDto
+            // с полным AuthorFullName и списком тегов.
             var created = await _articleRepo.GetDetailedByIdAsync(article.Id);
             return MapToDto(created!);
         }
@@ -56,16 +60,29 @@ namespace Blog.BLL.Services
         public async Task<ArticleDetailsDto?> GetByIdAsync(int id)
         {
             var a = await _articleRepo.GetDetailedByIdAsync(id);
-            if (a == null) return null;
+            if (a == null)
+                return null;
 
             return new ArticleDetailsDto(
-                a.Id, a.Title, a.Content, a.CreatedAt, a.UpdatedAt, a.AuthorId,
+                a.Id,
+                a.Title,
+                a.Content,
+                a.CreatedAt,
+                a.UpdatedAt,
+                a.AuthorId,
                 $"{a.Author.FirstName} {a.Author.LastName}".Trim(),
                 a.Tags.Select(t => t.Name).ToList(),
-                a.Comments.OrderByDescending(c => c.CreatedAt).Select(c => new CommentDto(
-                    c.Id, c.ArticleId, c.Content, c.CreatedAt, c.AuthorId,
-                    $"{c.Author.FirstName} {c.Author.LastName}".Trim()
-                )).ToList()
+                a.Comments
+                    .OrderByDescending(c => c.CreatedAt)
+                    .Select(c => new CommentDto(
+                        c.Id,
+                        c.ArticleId,
+                        c.Content,
+                        c.CreatedAt,
+                        c.AuthorId,
+                        $"{c.Author.FirstName} {c.Author.LastName}".Trim()
+                    ))
+                    .ToList()
             );
         }
 
@@ -75,7 +92,6 @@ namespace Blog.BLL.Services
             if (article == null)
                 return ServiceResult.NotFound("Статья не найдена.");
 
-            // Владелец, Модератор или Администратор имеют право на редактирование
             if (article.AuthorId != currentUserId && !isElevated)
                 return ServiceResult.Forbidden("Вы не являетесь автором этой статьи и не имеете прав модератора.");
 
@@ -101,7 +117,6 @@ namespace Blog.BLL.Services
             if (article == null)
                 return ServiceResult.NotFound("Статья не найдена.");
 
-            // Удалять может автор, Модератор или Администратор
             if (article.AuthorId != currentUserId && !isElevated)
                 return ServiceResult.Forbidden("Вы не можете удалить чужую публикацию.");
 
@@ -110,12 +125,16 @@ namespace Blog.BLL.Services
             return ServiceResult.Ok();
         }
 
-        private static ArticleDto MapToDto(Article a) =>
-            new(
-                a.Id, a.Title, a.Content, a.CreatedAt, a.UpdatedAt, a.AuthorId,
-                $"{a.Author?.FirstName} {a.Author?.LastName}".Trim(),
-                a.Tags.Select(t => t.Name).ToList(),
-                a.Comments?.Count ?? 0
-            );
+        private static ArticleDto MapToDto(Article a) => new(
+            a.Id,
+            a.Title,
+            a.Content,
+            a.CreatedAt,
+            a.UpdatedAt,
+            a.AuthorId,
+            $"{a.Author?.FirstName} {a.Author?.LastName}".Trim(),
+            a.Tags.Select(t => t.Name).ToList(),
+            a.Comments?.Count ?? 0
+        );
     }
 }

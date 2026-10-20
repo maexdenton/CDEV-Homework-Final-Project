@@ -12,14 +12,24 @@ using Serilog;
 
 namespace Blog.Web
 {
+    /// <summary>
+    /// Точка входа приложения Blog3Tier.
+    /// Настраивает Serilog, DI-контейнер (DAL, BLL, Identity, авторизация),
+    /// конвейер middleware и инициализацию базы данных при старте.
+    /// </summary>
     public class Program
     {
+        /// <summary>
+        /// Запускает веб-приложение: конфигурирует сервисы, middleware и выполняет
+        /// инициализацию БД (миграции, роли, тестовые пользователи) перед стартом сервера.
+        /// </summary>
+        /// <param name="args">Аргументы командной строки.</param>
         public static async Task Main(string[] args)
         {
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("==================================================");
-            Console.WriteLine("  Инициализация запуска приложения Blog3Tier...");
+            Console.WriteLine(" Инициализация запуска приложения Blog3Tier...");
             Console.WriteLine("==================================================");
             Console.WriteLine();
             Console.ResetColor();
@@ -40,13 +50,13 @@ namespace Blog.Web
             builder.Services.AddDbContext<BlogDbContext>(options =>
                 options.UseSqlServer(connectionString));
             builder.Services.AddScoped<IArticleRepository, ArticleRepository>();
-            builder.Services.AddScoped<ICommentRepository, CommentRepository>();
             builder.Services.AddScoped<ITagRepository, TagRepository>();
+            builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 
             // Business Logic Layer
             builder.Services.AddScoped<IArticleService, ArticleService>();
-            builder.Services.AddScoped<ICommentService, CommentService>();
             builder.Services.AddScoped<ITagService, TagService>();
+            builder.Services.AddScoped<ICommentService, CommentService>();
             builder.Services.AddScoped<IUserService, UserService>();
 
             // ASP.NET Core Identity
@@ -58,11 +68,13 @@ namespace Blog.Web
                 options.Password.RequireUppercase = false;
                 options.Password.RequireLowercase = false;
             })
-            .AddEntityFrameworkStores<BlogDbContext>()
-            .AddDefaultTokenProviders();
+                .AddEntityFrameworkStores<BlogDbContext>()
+                .AddDefaultTokenProviders();
 
             builder.Services.AddAuthorization(options =>
             {
+                // Каждое разрешение из AppPermissions.All превращается в политику,
+                // проверяющую claim "permission" — это позволяет гибко управлять доступом без изменения кода.
                 foreach (var permission in AppPermissions.All)
                 {
                     options.AddPolicy(permission, policy =>
@@ -76,7 +88,6 @@ namespace Blog.Web
                 options.AccessDeniedPath = "/Error/403";
             });
 
-            // Регистрация глобального фильтра аудита действий пользователя
             builder.Services.AddControllersWithViews(options =>
             {
                 options.Filters.Add<AuditLogFilter>();
@@ -87,7 +98,6 @@ namespace Blog.Web
 
             var app = builder.Build();
 
-            // Конвейер middleware
             app.UseMiddleware<GlobalExceptionMiddleware>();
             app.UseExceptionHandler("/Error");
 
@@ -101,13 +111,13 @@ namespace Blog.Web
             app.UseStaticFiles();
             app.UseRouting();
 
-            // Middleware для добавления UserName, IP и URL в контекст логов
+            // Обогащает логи контекстом пользователя (UserName, IP, URL), чтобы записи
+            // можно было фильтровать по конкретному пользователю или запросу.
             app.UseMiddleware<UserContextLoggingMiddleware>();
 
             app.UseAuthentication();
             app.UseAuthorization();
 
-            // Логирование всех входящих HTTP-запросов
             app.UseSerilogRequestLogging(options =>
             {
                 options.MessageTemplate = "HTTP {RequestMethod} {FullUrl} responded {StatusCode} in {Elapsed:0.0000} ms";
@@ -118,15 +128,15 @@ namespace Blog.Web
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+
             app.MapControllers();
 
-            // Инициализация БД (миграции, роли, пользователи)
+            // Инициализация идемпотентна: повторный запуск не создает дубликаты ролей и пользователей.
             using (var scope = app.Services.CreateScope())
             {
                 await DbInitializer.InitializeAsync(scope.ServiceProvider);
             }
 
-            // 3. Запуск приложения с перехватом фатальных ошибок
             try
             {
                 Log.Information("Запуск веб-сервера...");
@@ -138,7 +148,7 @@ namespace Blog.Web
             }
             finally
             {
-                // Обеспечиваем сброс оставшихся логов при выключении
+                // Сбрасывает буферизованные логи при выключении, чтобы последние записи не потерялись.
                 Log.CloseAndFlush();
             }
         }

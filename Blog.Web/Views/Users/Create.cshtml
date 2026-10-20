@@ -10,7 +10,6 @@
             <form asp-action="Create">
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                 
-                <!-- Поля Имя и Фамилия -->
                 <div class="form-group mb-3">
                     <label asp-for="FirstName" class="control-label fw-semibold">Имя</label>
                     <input asp-for="FirstName" class="form-control" />
@@ -29,7 +28,7 @@
                     <span asp-validation-for="Email" class="text-danger small"></span>
                 </div>
                 
-                <!-- Поле "Пароль" с кнопкой переключения видимости -->
+                <!-- Пароль по умолчанию скрыт; кнопка-глаз позволяет администратору проверить ввод и снизить риск опечатки при создании учетной записи. -->
                 <div class="mb-3">
                     <label asp-for="Password" class="form-label fw-semibold"></label>
                     <div class="input-group">
@@ -43,7 +42,7 @@
                     <span asp-validation-for="Password" class="text-danger small"></span>
                 </div>
 
-                <!-- Поле "Подтверждение пароля" с идентичной кнопкой -->
+                <!-- Кнопка-глаз на подтверждении помогает сверить ввод с паролем: частая ошибка при ручном создании пользователя. -->
                 <div class="mb-3">
                     <label asp-for="ConfirmPassword" class="form-label fw-semibold"></label>
                     <div class="input-group">
@@ -57,7 +56,6 @@
                     <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
                 </div>
                 
-                <!-- Блок с ролями -->
                 <div class="form-group mb-3">
                     <label class="control-label fw-semibold">Роли</label>
                     @foreach (var role in Model.AllRoles)
@@ -81,6 +79,8 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     
     <script>
+        // Переключает видимость пароля. Вынесено в отдельную функцию, чтобы одна и та же логика
+        // использовалась на двух полях (пароль и подтверждение) без дублирования разметки.
         function togglePasswordVisibility(inputId, iconId) {
             const input = document.getElementById(inputId);
             const icon = document.getElementById(iconId);

@@ -5,14 +5,26 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Middlewares
 {
-    // Глобальный middleware для перехвата необработанных исключений в конвейере ASP.NET Core.
-    // Разделяет стратегии обработки для API-запросов (возврат JSON) и MVC-запросов 
-    // (проброс исключения дальше, чтобы UseExceptionHandler показал страницу ошибки).
+    /// <summary>
+    /// Глобальный middleware для перехвата необработанных исключений в конвейере ASP.NET Core.
+    /// Разделяет стратегии обработки для API-запросов (возврат JSON в формате ProblemDetails)
+    /// и MVC-запросов (проброс исключения дальше, чтобы <c>UseExceptionHandler</c> показал страницу ошибки).
+    /// </summary>
     public class GlobalExceptionMiddleware
     {
         private readonly RequestDelegate _next;
-        public GlobalExceptionMiddleware(RequestDelegate next) => _next = next;
 
+        public GlobalExceptionMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+
+        /// <summary>
+        /// Перехватывает исключения, возникшие при обработке запроса.
+        /// Для путей, начинающихся с <c>/api</c>, формирует JSON-ответ;
+        /// для остальных запросов пробрасывает исключение дальше по конвейеру.
+        /// </summary>
+        /// <param name="context">Контекст текущего HTTP-запроса.</param>
         public async Task InvokeAsync(HttpContext context)
         {
             try
@@ -23,12 +35,8 @@ namespace Blog.Web.Middlewares
             {
                 var user = context.User.Identity?.Name ?? "Anonymous";
 
-                // Логируем ошибку через Serilog с контекстом
                 Log.Error(ex, "Unhandled exception for {Method} {Path} by {User}. TraceId: {TraceId}",
-                    context.Request.Method,
-                    context.Request.Path,
-                    user,
-                    context.TraceIdentifier);
+                    context.Request.Method, context.Request.Path, user, context.TraceIdentifier);
 
                 if (context.Request.Path.StartsWithSegments("/api"))
                 {
@@ -36,14 +44,19 @@ namespace Blog.Web.Middlewares
                 }
                 else
                 {
-                    throw; // Пробрасываем для UseExceptionHandler (страница 500)
+                    // Пробрасываем для UseExceptionHandler (страница 500).
+                    throw;
                 }
             }
         }
 
-        // Формирует JSON-ответ для API-запросов при возникновении исключения.
-        // Использует стандартный ProblemDetails (RFC 7807) — единый формат описания ошибок,
-        // который понимают многие HTTP-клиенты и инструменты (Swagger, Postman и т.д.).
+        /// <summary>
+        /// Формирует JSON-ответ для API-запросов при возникновении исключения.
+        /// Использует стандартный <see cref="ProblemDetails"/> (RFC 7807) — единый формат описания ошибок,
+        /// который понимают многие HTTP-клиенты и инструменты (Swagger, Postman и т.д.).
+        /// </summary>
+        /// <param name="context">Контекст текущего HTTP-запроса.</param>
+        /// <param name="exception">Перехваченное исключение.</param>
         private static async Task HandleApiExceptionAsync(HttpContext context, Exception exception)
         {
             context.Response.ContentType = "application/json";
@@ -53,9 +66,8 @@ namespace Blog.Web.Middlewares
             {
                 Status = context.Response.StatusCode,
                 Title = "Ошибка сервера",
-
-                // Detail содержит текст исключения. В production этот текст,
-                // возможно, стоит скрывать, чтобы не раскрывать внутренние детали
+                // Detail содержит текст исключения (в production этот текст,
+                // возможно, стоит скрывать, чтобы не раскрывать внутренние детали).
                 Detail = exception.Message
             };
 

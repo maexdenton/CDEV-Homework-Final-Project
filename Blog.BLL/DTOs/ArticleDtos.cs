@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
-    // DTO создания статьи
+    /// <summary>
+    /// DTO для создания статьи.
+    /// </summary>
     public class CreateArticleDto
     {
         [Required(ErrorMessage = "Заголовок обязателен")]
@@ -22,7 +23,9 @@ namespace Blog.BLL.DTOs
         public List<string> Tags { get; set; } = new();
     }
 
-    // DTO редактирования статьи
+    /// <summary>
+    /// DTO для редактирования статьи.
+    /// </summary>
     public class UpdateArticleDto
     {
         [Required(ErrorMessage = "Заголовок обязателен")]
@@ -36,7 +39,9 @@ namespace Blog.BLL.DTOs
         public List<string> Tags { get; set; } = new();
     }
 
-    // DTO краткого отображения статьи для списков
+    /// <summary>
+    /// DTO для краткого отображения статьи в списках.
+    /// </summary>
     public record ArticleDto(
         int Id,
         string Title,
@@ -49,7 +54,9 @@ namespace Blog.BLL.DTOs
         int CommentsCount
     );
 
-    // DTO подробного отображения статьи с комментариями
+    /// <summary>
+    /// DTO для подробного отображения статьи с комментариями.
+    /// </summary>
     public record ArticleDetailsDto(
         int Id,
         string Title,

@@ -2,13 +2,11 @@
 @model Blog.Web.ViewModels.RoleListViewModel
 @{
     ViewData["Title"] = "Детали роли";
-    
-    // Определяем, является ли роль системной
+
     bool isSystemRole = Model.Name == AppRoles.Administrator || 
                         Model.Name == AppRoles.Moderator || 
                         Model.Name == AppRoles.User;
 
-    // Формируем описание в зависимости от роли
     string description = Model.Name switch
     {
         AppRoles.Administrator => "Полный доступ ко всем разделам системы. Управляет пользователями, назначает роли и имеет права на любые действия с контентом.",

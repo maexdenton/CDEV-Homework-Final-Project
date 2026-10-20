@@ -20,8 +20,6 @@ namespace Blog.Web.Controllers
     {
         private readonly IArticleService _articleService;
         private readonly ICommentService _commentService;
-
-        // Логгер для фиксации значимых действий пользователя (создание, редактирование и т.д.)
         private readonly ILogger<HomeController> _logger;
 
         public HomeController(
@@ -37,12 +35,14 @@ namespace Blog.Web.Controllers
         /// <summary>
         /// Главная страница: лента статей с фильтрацией по поисковому запросу и тегу.
         /// </summary>
+        /// <param name="search">Поисковая строка (необязательно).</param>
+        /// <param name="tag">Название тега для фильтрации (необязательно).</param>
+        /// <returns>Представление с лентой статей.</returns>
         [HttpGet]
         public async Task<IActionResult> Index(string? search, string? tag)
         {
             ViewData["SearchQuery"] = search;
             ViewData["CurrentTag"] = tag;
-
             var articles = await _articleService.GetAllAsync(search, tag);
             return View(articles);
         }
@@ -50,6 +50,8 @@ namespace Blog.Web.Controllers
         /// <summary>
         /// Просмотр конкретной статьи и всех ее комментариев.
         /// </summary>
+        /// <param name="id">Идентификатор статьи.</param>
+        /// <returns>Представление статьи или 404, если статья не найдена.</returns>
         [HttpGet]
         public async Task<IActionResult> Details(int id)
         {
@@ -60,12 +62,21 @@ namespace Blog.Web.Controllers
             return View(article);
         }
 
-        // GET: /Home/Create
+        /// <summary>
+        /// Отображает форму создания новой статьи.
+        /// Доступно только аутентифицированным пользователям.
+        /// </summary>
+        /// <returns>Представление с формой создания.</returns>
         [Authorize]
         [HttpGet]
         public IActionResult Create() => View(new ArticleCreateViewModel());
 
-        // POST: /Home/Create
+        /// <summary>
+        /// Обрабатывает создание новой статьи.
+        /// Автор статьи определяется по текущей сессии, а не по данным из формы.
+        /// </summary>
+        /// <param name="model">Данные статьи из формы.</param>
+        /// <returns>Перенаправление на созданную статью или представление с ошибками.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -75,7 +86,6 @@ namespace Blog.Web.Controllers
                 return View(model);
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-
             var tagList = model.Tags?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList() ?? new List<string>();
@@ -90,7 +100,6 @@ namespace Blog.Web.Controllers
 
             var created = await _articleService.CreateAsync(dto, userId);
 
-            // ЛОГИРОВАНИЕ: Создание статьи
             _logger.LogInformation("User {User} created a new article titled '{Title}'",
                 User.Identity?.Name, model.Title);
 
@@ -98,7 +107,12 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id = created.Id });
         }
 
-        // GET: /Home/Edit/{id}
+        /// <summary>
+        /// Отображает форму редактирования статьи.
+        /// Доступно автору, модератору или администратору.
+        /// </summary>
+        /// <param name="id">Идентификатор статьи.</param>
+        /// <returns>Представление с формой редактирования, 404 или 403.</returns>
         [Authorize]
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
@@ -111,9 +125,7 @@ namespace Blog.Web.Controllers
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
             if (article.AuthorId != userId && !isElevated)
-            {
                 return Forbid();
-            }
 
             var model = new ArticleEditViewModel
             {
@@ -126,16 +138,24 @@ namespace Blog.Web.Controllers
             return View(model);
         }
 
-        // POST: /Home/Edit/{id}
+        /// <summary>
+        /// Обрабатывает редактирование статьи.
+        /// Доступно автору, модератору или администратору.
+        /// </summary>
+        /// <param name="id">Идентификатор статьи.</param>
+        /// <param name="model">Данные статьи из формы.</param>
+        /// <returns>Перенаправление на статью или представление с ошибками.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, ArticleEditViewModel model)
         {
             var article = await _articleService.GetByIdAsync(id);
-            if (article == null) return NotFound();
+            if (article == null)
+                return NotFound();
 
-            // Обход валидации для старых данных (если заголовок короче 5 символов, но не менялся)
+            // Обход валидации для старых данных: если заголовок короче 5 символов,
+            // но пользователь его не менял, ошибка валидации не должна блокировать сохранение.
             if (article.Title == model.Title && article.Title.Length < 5)
             {
                 ModelState.Remove(nameof(model.Title));
@@ -159,7 +179,6 @@ namespace Blog.Web.Controllers
             };
 
             var result = await _articleService.UpdateAsync(id, dto, userId, isElevated);
-
             if (!result.Succeeded)
             {
                 if (result.Status == ResultStatus.Forbidden)
@@ -169,10 +188,12 @@ namespace Blog.Web.Controllers
                 return View(model);
             }
 
-            // ЛОГИРОВАНИЕ: Редактирование статьи (фиксируем, какие именно поля изменились)
+            // Фиксируем в логе, какие именно поля изменились, — это упрощает аудит действий пользователя.
             var changes = new List<string>();
-            if (article.Title != model.Title) changes.Add($"Title: '{article.Title}' -> '{model.Title}'");
-            if (article.Content != model.Content) changes.Add("Content was modified");
+            if (article.Title != model.Title)
+                changes.Add($"Title: '{article.Title}' -> '{model.Title}'");
+            if (article.Content != model.Content)
+                changes.Add("Content was modified");
 
             _logger.LogInformation("User {User} edited article '{Title}'. Changes: {Changes}",
                 User.Identity?.Name, model.Title, string.Join("; ", changes));
@@ -181,7 +202,12 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        // POST: /Home/DeleteArticle/{id}
+        /// <summary>
+        /// Удаляет статью.
+        /// Доступно автору, модератору или администратору.
+        /// </summary>
+        /// <param name="id">Идентификатор статьи.</param>
+        /// <returns>Перенаправление на ленту статей или на страницу статьи при ошибке.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -192,7 +218,6 @@ namespace Blog.Web.Controllers
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
             var result = await _articleService.DeleteAsync(id, userId, isElevated);
-
             if (!result.Succeeded)
             {
                 if (result.Status == ResultStatus.Forbidden)
@@ -202,7 +227,6 @@ namespace Blog.Web.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
 
-            // ЛОГИРОВАНИЕ: Удаление статьи
             _logger.LogInformation("User {User} deleted article '{Title}'",
                 User.Identity?.Name, article?.Title);
 
@@ -210,7 +234,12 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST: /Home/AddComment
+        /// <summary>
+        /// Добавляет комментарий к статье от имени текущего пользователя.
+        /// </summary>
+        /// <param name="articleId">Идентификатор статьи.</param>
+        /// <param name="content">Текст комментария.</param>
+        /// <returns>Перенаправление на страницу статьи.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -219,19 +248,16 @@ namespace Blog.Web.Controllers
             if (!string.IsNullOrWhiteSpace(content))
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-
                 var result = await _commentService.CreateAsync(
                     new CreateCommentDto
                     {
                         ArticleId = articleId,
                         AuthorId = userId,
                         Content = content
-                    },
-                    userId);
+                    }, userId);
 
                 if (result.Succeeded)
                 {
-                    // ЛОГИРОВАНИЕ: Добавление комментария
                     _logger.LogInformation("User {User} added a comment to article {ArticleId}. Text: '{Content}'",
                         User.Identity?.Name, articleId, content);
 
@@ -246,7 +272,14 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // POST: /Home/EditComment
+        /// <summary>
+        /// Редактирует комментарий.
+        /// Доступно автору, модератору или администратору.
+        /// </summary>
+        /// <param name="commentId">Идентификатор комментария.</param>
+        /// <param name="articleId">Идентификатор статьи, к которой относится комментарий.</param>
+        /// <param name="content">Новый текст комментария.</param>
+        /// <returns>Перенаправление на страницу статьи.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -258,9 +291,8 @@ namespace Blog.Web.Controllers
                 return RedirectToAction(nameof(Details), new { id = articleId });
             }
 
-            // Получаем старый комментарий до изменений для логирования
+            // Старый текст нужен только для лога: в нем фиксируется, что именно изменилось.
             var oldComment = await _commentService.GetByIdAsync(commentId);
-
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
@@ -279,7 +311,6 @@ namespace Blog.Web.Controllers
             }
             else
             {
-                // ЛОГИРОВАНИЕ: Редактирование комментария (старый и новый текст)
                 _logger.LogInformation("User {User} edited comment {CommentId}. Old text: '{OldText}', New text: '{NewText}'",
                     User.Identity?.Name, commentId, oldComment?.Content, content);
 
@@ -289,20 +320,24 @@ namespace Blog.Web.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // POST: /Home/DeleteComment
+        /// <summary>
+        /// Удаляет комментарий.
+        /// Доступно автору, модератору или администратору.
+        /// </summary>
+        /// <param name="commentId">Идентификатор комментария.</param>
+        /// <param name="articleId">Идентификатор статьи, к которой относится комментарий.</param>
+        /// <returns>Перенаправление на страницу статьи.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteComment(int commentId, int articleId)
         {
-            // Получаем комментарий до удаления для логирования
+            // Текст удаляемого комментария нужен только для лога — после удаления восстановить его будет нельзя.
             var commentToDelete = await _commentService.GetByIdAsync(commentId);
-
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
             var result = await _commentService.DeleteAsync(commentId, userId, isElevated);
-
             if (!result.Succeeded)
             {
                 if (result.Status == ResultStatus.Forbidden)
@@ -312,7 +347,6 @@ namespace Blog.Web.Controllers
             }
             else
             {
-                // ЛОГИРОВАНИЕ: Удаление комментария (текст удаляемого комментария)
                 _logger.LogInformation("User {User} deleted comment {CommentId}. Deleted text: '{Content}'",
                     User.Identity?.Name, commentId, commentToDelete?.Content);
 

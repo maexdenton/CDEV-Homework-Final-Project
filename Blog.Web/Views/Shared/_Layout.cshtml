@@ -10,31 +10,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Blog Engine</title>
     
-    <!-- Основной CSS Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     
-    <!-- CSS Bootstrap Icons (необходим для иконок "Глаз" и уведомлений) -->
+    <!-- Bootstrap Icons нужен для иконок «Глаз» (пароль) и уведомлений (check/exclamation) в этой и других разметках. -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
     
     <style>
-        /* Предотвращает скачки верстки по горизонтали при появлении/исчезновении полосы прокрутки */
+        /* Предотвращает горизонтальные скачки верстки при появлении/исчезновении полосы прокрутки. */
         html {
             overflow-y: scroll;
         }
 
-        /* Растягиваем body на всю высоту экрана через Flexbox */
         body {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        /* Основной контент забирает все свободное пространство, прижимая футер к низу */
+        /* Прижимает футер к низу экрана, забирая все свободное пространство. */
         .main-content {
             flex: 1 0 auto;
         }
 
-        /* Жесткая фиксация высоты футера без изменений при переходах */
+        /* Фиксирует высоту футера, чтобы она не менялась при переходах между страницами. */
         .site-footer {
             flex-shrink: 0;
             height: 60px;
@@ -49,17 +47,14 @@
     <header>
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
             <div class="container">
-                <!-- Ссылка на главную страницу -->
                 <a class="navbar-brand fw-bold" asp-controller="Home" asp-action="Index">Blog Engine</a>
                 
-                <!-- Кнопка для мобильного меню (гамбургер) -->
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 
                 <div class="collapse navbar-collapse" id="navbarContent">
                     
-                    <!-- ЛЕВАЯ ЧАСТЬ МЕНЮ: Администрирование -->
                     <ul class="navbar-nav me-auto">
                         @if (User.IsInRole(AppRoles.Administrator))
                         {
@@ -75,28 +70,24 @@
                         }
                     </ul>
 
-                    <!-- ПРАВАЯ ЧАСТЬ: Профиль пользователя / Авторизация -->
                     <ul class="navbar-nav align-items-center">
                         @if (User.Identity?.IsAuthenticated ?? false)
                         {
-                            // Получаем данные текущего пользователя для красивого вывода имени
+                            // Имя показываем из профиля (FirstName/LastName), а если они пусты — логин из Identity.
                             var currentUser = await UserManager.GetUserAsync(User);
                             var displayName = (currentUser != null && (!string.IsNullOrWhiteSpace(currentUser.FirstName) || !string.IsNullOrWhiteSpace(currentUser.LastName)))
                                 ? $"{currentUser.FirstName} {currentUser.LastName}".Trim()
                                 : User.Identity.Name;
 
-                            <!-- Выпадающее меню профиля -->
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle text-light" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     Привет, <strong>@displayName</strong>!
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                    <!-- Ссылка на смену пароля -->
                                     <li>
                                         <a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Сменить пароль</a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <!-- Кнопка выхода -->
                                     <li>
                                         <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()
@@ -108,7 +99,6 @@
                         }
                         else
                         {
-                            <!-- Меню для неавторизованных пользователей -->
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Account" asp-action="Login">Вход</a>
                             </li>
@@ -122,10 +112,9 @@
         </nav>
     </header>
 
-    <!-- Обертка основного контента страницы -->
     <div class="container main-content pb-4">
         
-        <!-- БЛОК УВЕДОМЛЕНИЙ (TempData) -->
+        @* Сообщения из TempData показываются один раз после редиректа — это стандартный паттерн PRG. *@
         @if (TempData["SuccessMessage"] != null)
         {
             <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
@@ -142,22 +131,20 @@
         }
 
         <main role="main">
-            @* Сюда Razor вставляет HTML-код конкретного представления *@
             @RenderBody()
         </main>
     </div>
 
-    <!-- Футер, прижатый к низу экрана -->
     <footer class="border-top site-footer text-muted bg-white text-center">
         <div class="container">
             &copy; @DateTime.Now.Year - Blog Engine
         </div>
     </footer>
 
-    <!-- Скрипты Bootstrap (для работы меню и закрытия уведомлений) -->
+    <!-- Bootstrap JS нужен для работы выпадающих меню и закрытия уведомлений по крестику. -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Секция скриптов для конкретных представлений (валидация, кнопка "Глаз") -->
+    <!-- Секция Scripts: сюда представления добавляют валидацию и JS «Глаз» для пароля. -->
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

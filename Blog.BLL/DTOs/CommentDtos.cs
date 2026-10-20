@@ -1,11 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
-    // DTO добавления комментария к публикации
+    /// <summary>
+    /// DTO для добавления комментария к публикации.
+    /// </summary>
     public class CreateCommentDto
     {
         [Required(ErrorMessage = "Идентификатор статьи обязателен")]
@@ -19,7 +19,9 @@ namespace Blog.BLL.DTOs
         public string Content { get; set; } = string.Empty;
     }
 
-    // DTO редактирования существующего комментария
+    /// <summary>
+    /// DTO для редактирования существующего комментария.
+    /// </summary>
     public class UpdateCommentDto
     {
         [Required(ErrorMessage = "Текст комментария не может быть пустым")]
@@ -27,7 +29,9 @@ namespace Blog.BLL.DTOs
         public string Content { get; set; } = string.Empty;
     }
 
-    // DTO отображения комментария
+    /// <summary>
+    /// DTO для отображения комментария.
+    /// </summary>
     public record CommentDto(
         int Id,
         int ArticleId,

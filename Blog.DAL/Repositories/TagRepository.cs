@@ -6,9 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Blog.DAL.Repositories
 {
-    // Репозиторий для работы с сущностями "Тег".
-    // Реализует контракт ITagRepository, инкапсулируя запросы к БД, 
-    // связанные с тегами и их связями со статьями и создателями.
+    /// <summary>
+    /// Репозиторий для работы с сущностями «Тег».
+    /// Реализует контракт <see cref="ITagRepository"/>, инкапсулируя запросы к БД,
+    /// связанные с тегами и их связями со статьями и создателями.
+    /// </summary>
     public class TagRepository : ITagRepository
     {
         private readonly BlogDbContext _context;
@@ -18,20 +20,45 @@ namespace Blog.DAL.Repositories
             _context = context;
         }
 
-        // Получение всех тегов вместе со связанными статьями и их создателями
+        /// <summary>
+        /// Возвращает все теги с загруженными статьями и создателями (без отслеживания изменений).
+        /// </summary>
+        /// <returns>Коллекция тегов.</returns>
         public async Task<IEnumerable<Tag>> GetAllAsync() =>
-            await _context.Tags.Include(t => t.Articles).Include(t => t.Creator).AsNoTracking().ToListAsync();
+            await _context.Tags
+                .Include(t => t.Articles)
+                .Include(t => t.Creator)
+                .AsNoTracking()
+                .ToListAsync();
 
-        // Получение тега по ID вместе со статьями и создателем
+        /// <summary>
+        /// Возвращает тег по идентификатору с загруженными статьями и создателем.
+        /// </summary>
+        /// <param name="id">Идентификатор тега.</param>
+        /// <returns>Тег или null, если не найден.</returns>
         public async Task<Tag?> GetByIdAsync(int id) =>
-            await _context.Tags.Include(t => t.Articles).Include(t => t.Creator).FirstOrDefaultAsync(t => t.Id == id);
+            await _context.Tags
+                .Include(t => t.Articles)
+                .Include(t => t.Creator)
+                .FirstOrDefaultAsync(t => t.Id == id);
 
-        // Поиск тега по точному названию
+        /// <summary>
+        /// Находит тег по точному названию (без учета регистра).
+        /// </summary>
+        /// <param name="name">Название тега.</param>
+        /// <returns>Тег или null, если тег с таким именем не найден.</returns>
         public async Task<Tag?> GetByNameAsync(string name) =>
-            await _context.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
+            await _context.Tags
+                .FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
 
-        // Получает существующие теги по именам и создает недостающие
-        public async Task<List<Tag>> GetOrCreateTagsAsync(IEnumerable<string> tagNames, string? creatorId = null)
+        /// <summary>
+        /// Разрешает список имен тегов: возвращает существующие теги и создает отсутствующие
+        /// с указанием создателя. Имена нормализуются (Trim, ToLower) и дедуплицируются.
+        /// </summary>
+        /// <param name="tagNames">Коллекция имен тегов.</param>
+        /// <param name="creatorId">Идентификатор создателя для новых тегов (необязательно).</param>
+        /// <returns>Коллекция сущностей тегов, соответствующих переданным именам.</returns>
+        public async Task<IEnumerable<Tag>> GetOrCreateTagsAsync(IEnumerable<string> tagNames, string? creatorId = null)
         {
             var cleanNames = tagNames
                 .Select(t => t.Trim().ToLower())
@@ -39,8 +66,13 @@ namespace Blog.DAL.Repositories
                 .Distinct()
                 .ToList();
 
-            var existing = await _context.Tags.Where(t => cleanNames.Contains(t.Name.ToLower())).ToListAsync();
-            var missingNames = cleanNames.Except(existing.Select(e => e.Name.ToLower())).ToList();
+            var existing = await _context.Tags
+                .Where(t => cleanNames.Contains(t.Name.ToLower()))
+                .ToListAsync();
+
+            var missingNames = cleanNames
+                .Except(existing.Select(e => e.Name.ToLower()))
+                .ToList();
 
             var createdTags = new List<Tag>();
             foreach (var name in missingNames)
@@ -58,13 +90,31 @@ namespace Blog.DAL.Repositories
             return existing.Concat(createdTags).ToList();
         }
 
-        // Добавление нового тега в контекст
-        public async Task AddAsync(Tag entity) => await _context.Tags.AddAsync(entity);
-        // Обновление существующего тега (например, при переименовании)
-        public void Update(Tag entity) => _context.Tags.Update(entity);
-        // Удаление тега
-        public void Delete(Tag entity) => _context.Tags.Remove(entity);
-        // Сохранение всех накопленных изменений в БД
-        public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
+        /// <summary>
+        /// Добавляет новый тег в контекст (без сохранения).
+        /// </summary>
+        /// <param name="entity">Сущность тега.</param>
+        public async Task AddAsync(Tag entity) =>
+            await _context.Tags.AddAsync(entity);
+
+        /// <summary>
+        /// Помечает тег как измененный (например, при переименовании).
+        /// </summary>
+        /// <param name="entity">Измененная сущность тега.</param>
+        public void Update(Tag entity) =>
+            _context.Tags.Update(entity);
+
+        /// <summary>
+        /// Помечает тег как удаленный.
+        /// </summary>
+        /// <param name="entity">Сущность тега для удаления.</param>
+        public void Delete(Tag entity) =>
+            _context.Tags.Remove(entity);
+
+        /// <summary>
+        /// Сохраняет все накопленные изменения в базе данных.
+        /// </summary>
+        public async Task SaveChangesAsync() =>
+            await _context.SaveChangesAsync();
     }
 }

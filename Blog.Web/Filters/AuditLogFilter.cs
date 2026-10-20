@@ -1,9 +1,17 @@
-﻿using Microsoft.AspNetCore.Mvc.Filters;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Blog.Web.Filters
 {
+    /// <summary>
+    /// Фильтр действий (action filter), который ведет аудит выполнения запросов:
+    /// фиксирует начало и результат действия, ошибки валидации и отказы в авторизации.
+    /// Используется для наблюдаемости и последующего анализа инцидентов безопасности.
+    /// </summary>
     public class AuditLogFilter : IAsyncActionFilter
     {
         private readonly ILogger<AuditLogFilter> _logger;
@@ -13,6 +21,13 @@ namespace Blog.Web.Filters
             _logger = logger;
         }
 
+        /// <summary>
+        /// Вызывается до и после выполнения действия. Логирует начало выполнения,
+        /// ошибки валидации, отказы в авторизации и итоговый результат.
+        /// Исключения не перехватывает: они обрабатываются в <c>GlobalExceptionMiddleware</c>.
+        /// </summary>
+        /// <param name="context">Контекст выполнения действия.</param>
+        /// <param name="next">Делегат, вызывающий следующее звено конвейера.</param>
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             var controllerName = context.Controller.GetType().Name;
@@ -22,16 +37,14 @@ namespace Blog.Web.Filters
 
             var stopwatch = Stopwatch.StartNew();
 
-            // 1. Логируем начало выполнения действия
             _logger.LogInformation("User {UserName} started {HttpMethod} {Controller}/{Action}",
                 userName, httpMethod, controllerName, actionName);
 
-            var executedContext = await next(); // Выполнение действия
+            var executedContext = await next();
 
             stopwatch.Stop();
             var elapsedMs = stopwatch.ElapsedMilliseconds;
 
-            // 2. Проверяем ошибки валидации (ModelState)
             if (!context.ModelState.IsValid)
             {
                 var errors = context.ModelState
@@ -42,29 +55,27 @@ namespace Blog.Web.Filters
 
                 foreach (var error in errors)
                 {
-                    // Логируем ошибки валидации с уровнем Warning
+                    // Ошибки валидации — это ошибка пользователя, а не сбой системы, поэтому Warning.
                     _logger.LogWarning("Validation error in {Controller}/{Action} by {UserName}: {ValidationError}",
                         controllerName, actionName, userName, error);
                 }
             }
 
-            // 3. Проверяем ошибки авторизации (например, возврат Forbid())
-            if (executedContext.Result is Microsoft.AspNetCore.Mvc.ForbidResult)
+            if (executedContext.Result is ForbidResult)
             {
                 _logger.LogWarning("Authorization failed for {Controller}/{Action} by {UserName}",
                     controllerName, actionName, userName);
             }
 
-            // 4. Логируем результат выполнения
             if (executedContext.Exception != null && !executedContext.ExceptionHandled)
             {
-                // Само исключение будет залогировано в GlobalExceptionMiddleware
+                // Само исключение логируется в GlobalExceptionMiddleware с уровнем Error;
+                // здесь фиксируется только факт неуспешного завершения действия.
                 _logger.LogWarning("Action {Controller}/{Action} failed for {UserName} after {Elapsed} ms",
                     controllerName, actionName, userName, elapsedMs);
             }
-            else if (context.ModelState.IsValid && !(executedContext.Result is Microsoft.AspNetCore.Mvc.ForbidResult))
+            else if (context.ModelState.IsValid && executedContext.Result is not ForbidResult)
             {
-                // Успех (только если нет ошибок валидации и запретов)
                 _logger.LogInformation("User {UserName} completed {HttpMethod} {Controller}/{Action} successfully in {Elapsed} ms",
                     userName, httpMethod, controllerName, actionName, elapsedMs);
             }

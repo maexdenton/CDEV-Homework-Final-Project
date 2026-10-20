@@ -1,17 +1,20 @@
-﻿using Blog.DAL.Entities;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
+using Blog.DAL.Entities;
 
 namespace Blog.DAL.Repositories
 {
-    // Интерфейс репозитория для управления сущностями "Комментарий"
+    /// <summary>
+    /// Контракт репозитория для работы с сущностями «Комментарий».
+    /// </summary>
     public interface ICommentRepository : IRepository<Comment>
     {
-        // Возвращает все комментарии с подгруженными данными об авторах и статьях
+        new Task<IEnumerable<Comment>> GetAllAsync();
+
+        new Task<Comment?> GetByIdAsync(int id);
+
         Task<IEnumerable<Comment>> GetAllWithDetailsAsync();
 
-        // Возвращает комментарий по идентификатору с загрузкой автора
         Task<Comment?> GetWithDetailsByIdAsync(int id);
     }
 }

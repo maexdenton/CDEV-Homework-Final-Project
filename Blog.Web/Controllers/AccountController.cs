@@ -9,15 +9,13 @@ using Microsoft.AspNetCore.Mvc;
 namespace Blog.Web.Controllers
 {
     /// <summary>
-    /// MVC-контроллер для аутентификации и управления учетной записью
+    /// MVC-контроллер для аутентификации и управления учетной записью пользователя.
     /// </summary>
     public class AccountController : Controller
     {
         private readonly IUserService _userService;
         private readonly SignInManager<User> _signInManager;
         private readonly UserManager<User> _userManager;
-
-        // Логгер для фиксации событий безопасности и ошибок входа
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
@@ -32,7 +30,10 @@ namespace Blog.Web.Controllers
             _logger = logger;
         }
 
-        // GET: /Account/Register
+        /// <summary>
+        /// Отображает страницу регистрации. Если пользователь уже аутентифицирован, перенаправляет на главную.
+        /// </summary>
+        /// <returns>Представление регистрации или перенаправление.</returns>
         [HttpGet]
         public IActionResult Register()
         {
@@ -42,7 +43,11 @@ namespace Blog.Web.Controllers
             return View();
         }
 
-        // POST: /Account/Register
+        /// <summary>
+        /// Обрабатывает регистрацию нового пользователя.
+        /// </summary>
+        /// <param name="model">Данные регистрации из формы.</param>
+        /// <returns>Перенаправление при успехе или представление с ошибками валидации.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model)
@@ -60,10 +65,10 @@ namespace Blog.Web.Controllers
             };
 
             var result = await _userService.RegisterAsync(dto);
-
             if (!result.Succeeded)
             {
-                // Ошибки бизнес-логики (например, email уже занят) логируем как Warning
+                // Ошибки бизнес-логики (например, занятый email) не являются системными сбоями,
+                // поэтому логируются как Warning, а не Error.
                 _logger.LogWarning("Registration failed for {Email}. Reason: {Reason}",
                     model.Email, result.Message ?? "Unknown error");
 
@@ -81,7 +86,11 @@ namespace Blog.Web.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // GET: /Account/Login
+        /// <summary>
+        /// Отображает страницу входа. Если пользователь уже аутентифицирован, перенаправляет на главную.
+        /// </summary>
+        /// <param name="returnUrl">URL для возврата после успешного входа (необязательно).</param>
+        /// <returns>Представление входа или перенаправление.</returns>
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
@@ -92,7 +101,12 @@ namespace Blog.Web.Controllers
             return View();
         }
 
-        // POST: /Account/Login
+        /// <summary>
+        /// Обрабатывает вход пользователя по email и паролю.
+        /// </summary>
+        /// <param name="model">Учетные данные из формы.</param>
+        /// <param name="returnUrl">URL для возврата после успешного входа (необязательно).</param>
+        /// <returns>Перенаправление при успехе или представление с ошибкой.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
@@ -101,10 +115,7 @@ namespace Blog.Web.Controllers
                 return View(model);
 
             var result = await _signInManager.PasswordSignInAsync(
-                model.Email,
-                model.Password,
-                isPersistent: true,
-                lockoutOnFailure: false);
+                model.Email, model.Password, isPersistent: true, lockoutOnFailure: false);
 
             if (result.Succeeded)
             {
@@ -116,21 +127,30 @@ namespace Blog.Web.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            // ЛОГИРОВАНИЕ ОШИБКИ АВТОРИЗАЦИИ (согласно требованию - уровень Error)
+            // Неудачная попытка входа логируется с уровнем Error, т.к. может указывать
+            // на попытку подбора учетных данных.
             _logger.LogError("Failed login attempt for email {Email}. Invalid credentials.", model.Email);
 
             ModelState.AddModelError(string.Empty, "Неверный адрес электронной почты или пароль.");
             return View(model);
         }
 
-        // GET: /Account/ChangePassword
+        /// <summary>
+        /// Отображает страницу смены пароля. Доступно только аутентифицированным пользователям.
+        /// </summary>
+        /// <returns>Представление смены пароля.</returns>
         [Authorize]
+        [HttpGet]
         public IActionResult ChangePassword()
         {
             return View();
         }
 
-        // POST: /Account/ChangePassword
+        /// <summary>
+        /// Обрабатывает смену пароля текущего пользователя.
+        /// </summary>
+        /// <param name="model">Данные смены пароля из формы.</param>
+        /// <returns>Перенаправление при успехе или представление с ошибками.</returns>
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -146,9 +166,7 @@ namespace Blog.Web.Controllers
             }
 
             var changePasswordResult = await _userManager.ChangePasswordAsync(
-                user,
-                model.CurrentPassword,
-                model.NewPassword);
+                user, model.CurrentPassword, model.NewPassword);
 
             if (!changePasswordResult.Succeeded)
             {
@@ -156,7 +174,8 @@ namespace Blog.Web.Controllers
                 {
                     if (error.Code == "PasswordMismatch")
                     {
-                        // Неверный текущий пароль - логируем как Warning (ошибка пользователя)
+                        // Неверный текущий пароль — это ошибка пользователя, а не сбой системы,
+                        // поэтому логируется как Warning.
                         _logger.LogWarning("Failed password change attempt for user {Email}. Incorrect current password.", user.Email);
                         ModelState.AddModelError(string.Empty, "Неверный текущий пароль");
                     }
@@ -170,28 +189,34 @@ namespace Blog.Web.Controllers
             }
 
             await _signInManager.RefreshSignInAsync(user);
-
             _logger.LogInformation("User {Email} successfully changed their password.", user.Email);
+
             TempData["SuccessMessage"] = "Ваш пароль был успешно изменен.";
             return RedirectToAction("Index", "Home");
         }
 
-        // POST: /Account/Logout
+        /// <summary>
+        /// Выполняет выход текущего пользователя из системы.
+        /// </summary>
+        /// <returns>Перенаправление на главную страницу.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             var userEmail = User.Identity?.Name;
             await _signInManager.SignOutAsync();
-
             _logger.LogInformation("User {Email} logged out.", userEmail);
             return RedirectToAction("Index", "Home");
         }
 
-        // GET: /Account/AccessDenied
+        /// <summary>
+        /// Отображает страницу с сообщением об отказе в доступе.
+        /// </summary>
+        /// <returns>Представление с сообщением об отказе в доступе и HTTP-код 403.</returns>
         [HttpGet]
         public IActionResult AccessDenied()
         {
+            Response.StatusCode = 403;
             return View();
         }
     }
