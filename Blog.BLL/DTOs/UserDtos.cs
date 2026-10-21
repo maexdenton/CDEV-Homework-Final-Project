@@ -1,50 +1,60 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
     /// <summary>
-    /// DTO для регистрации новой учетной записи
+    /// DTO для регистрации нового пользователя.
     /// </summary>
     public class RegisterUserDto
     {
-        [Required(ErrorMessage = "Имя обязательно для заполнения")]
-        [StringLength(50, MinimumLength = 2, ErrorMessage = "Имя должно содержать от 2 до 50 символов")]
-        public string FirstName { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Фамилия обязательна для заполнения")]
-        [StringLength(50, MinimumLength = 2, ErrorMessage = "Фамилия должна содержать от 2 до 50 символов")]
-        public string LastName { get; set; } = string.Empty;
-
         [Required(ErrorMessage = "Email обязателен")]
-        [EmailAddress(ErrorMessage = "Некорректный формат адреса электронной почты")]
+        [EmailAddress(ErrorMessage = "Некорректный формат Email")]
         public string Email { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Пароль обязателен")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть длиной не менее 6 символов")]
-        [DataType(DataType.Password)]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть от 6 до 100 символов")]
         public string Password { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Подтверждение пароля обязательно")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть длиной не менее 6 символов")]
         [Compare(nameof(Password), ErrorMessage = "Пароли не совпадают")]
-        [DataType(DataType.Password)]
         public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Имя обязательно")]
+        [StringLength(50, MinimumLength = 2)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Фамилия обязательна")]
+        [StringLength(50, MinimumLength = 2)]
+        public string LastName { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// DTO для аутентификации пользователя.
+    /// </summary>
+    public class LoginDto
+    {
+        [Required(ErrorMessage = "Email обязателен")]
+        [EmailAddress(ErrorMessage = "Некорректный формат Email")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Пароль обязателен")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
     }
 
     /// <summary>
     /// DTO для редактирования профиля пользователя.
-    /// Исключает прямое изменение пароля и прав через этот контракт
     /// </summary>
     public class UpdateUserDto
     {
-        [Required(ErrorMessage = "Имя обязательно для заполнения")]
+        [Required(ErrorMessage = "Имя обязательно")]
         [StringLength(50, MinimumLength = 2)]
         public string FirstName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Фамилия обязательна для заполнения")]
+        [Required(ErrorMessage = "Фамилия обязательна")]
         [StringLength(50, MinimumLength = 2)]
         public string LastName { get; set; } = string.Empty;
 
@@ -53,8 +63,33 @@ namespace Blog.BLL.DTOs
     }
 
     /// <summary>
-    /// DTO для отображения информации о пользователе.
-    /// Не содержит чувствительных данных (хэшей паролей, секретных ключей)
+    /// DTO для смены пароля пользователя.
+    /// </summary>
+    public class ChangePasswordDto
+    {
+        [Required(ErrorMessage = "Текущий пароль обязателен")]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Новый пароль обязателен")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть от 6 до 100 символов")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Подтверждение пароля обязательно")]
+        [Compare(nameof(NewPassword), ErrorMessage = "Пароли не совпадают")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// DTO для изменения роли пользователя администратором.
+    /// </summary>
+    public class ChangeUserRoleDto
+    {
+        [Required(ErrorMessage = "Роль обязательна")]
+        public string RoleName { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// DTO для отображения данных пользователя.
     /// </summary>
     public record UserDto(
         string Id,
@@ -63,15 +98,6 @@ namespace Blog.BLL.DTOs
         string LastName,
         string? PhoneNumber,
         DateTime RegisteredAt,
-        IEnumerable<string> Roles
+        List<string> Roles
     );
-
-    /// <summary>
-    /// DTO для изменения роли
-    /// </summary>
-    public class ChangeUserRoleDto
-    {
-        [Required(ErrorMessage = "Имя роли обязательно")]
-        public string RoleName { get; set; } = string.Empty;
-    }
 }

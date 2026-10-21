@@ -4,9 +4,6 @@
     ViewData["Title"] = "Регистрация";
 }
 
-<!-- Подключение Bootstrap Icons для иконки глаза -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-
 <div class="row justify-content-center mt-4">
     <div class="col-md-6">
         <div class="card shadow-sm border-0">
@@ -36,7 +33,7 @@
                         <span asp-validation-for="Email" class="text-danger small"></span>
                     </div>
 
-                    <!-- Поле "Пароль" с кнопкой переключения видимости -->
+                    <!-- Пароль по умолчанию скрыт; кнопка-глаз позволяет пользователю проверить ввод и снизить риск опечатки при регистрации. -->
                     <div class="mb-3">
                         <label asp-for="Password" class="form-label fw-semibold"></label>
                         <div class="input-group">
@@ -50,7 +47,7 @@
                         <span asp-validation-for="Password" class="text-danger small"></span>
                     </div>
 
-                    <!-- Поле "Подтверждение пароля" с идентичной кнопкой -->
+                    <!-- Кнопка-глаз на подтверждении помогает визуально сверить ввод с паролем — частая ошибка при регистрации. -->
                     <div class="mb-3">
                         <label asp-for="ConfirmPassword" class="form-label fw-semibold"></label>
                         <div class="input-group">
@@ -80,12 +77,15 @@
     <partial name="_ValidationScriptsPartial" />
 
     <script>
-        // Переключает тип поля между "password" и "text",
-        // а также меняет иконку с открытого глаза на перечеркнутый
+        // Переключает видимость пароля. Вынесено в отдельную функцию, чтобы одна и та же логика
+        // использовалась на нескольких полях (пароль и подтверждение), а также могла быть
+        // переиспользована на страницах входа и смены пароля.
         function togglePasswordVisibility(inputId, iconId) {
             const input = document.getElementById(inputId);
             const icon = document.getElementById(iconId);
 
+            // Защита от несовпадения id в разметке и вызове: без нее отсутствие элемента
+            // привело бы к ошибке в консоли, не влияя на работу формы.
             if (!input || !icon) return;
 
             if (input.type === 'password') {

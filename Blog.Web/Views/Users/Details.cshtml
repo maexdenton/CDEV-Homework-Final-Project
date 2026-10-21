@@ -1,0 +1,18 @@
+﻿@model Blog.Web.ViewModels.UserDetailsViewModel
+@{
+    ViewData["Title"] = "Детали пользователя";
+}
+
+<div class="container mt-4">
+    <h2>Детали пользователя</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">@Model.FirstName @Model.LastName</h5>
+            <p class="card-text"><strong>Email:</strong> @Model.Email</p>
+            <p class="card-text"><strong>Дата регистрации:</strong> @Model.RegisteredAt.ToString("dd.MM.yyyy HH:mm")</p>
+            <p class="card-text"><strong>Роли:</strong> @(Model.Roles.Any() ? string.Join(", ", Model.Roles) : "Нет ролей")</p>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">Изменить</a>
+            <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+</div>

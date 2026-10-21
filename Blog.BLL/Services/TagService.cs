@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Blog.BLL.DTOs;
-using Blog.BLL.Security;
 using Blog.DAL.Entities;
 using Blog.DAL.Repositories;
-using Microsoft.EntityFrameworkCore;
 
 namespace Blog.BLL.Services
 {
     /// <summary>
-    /// Сервис бизнес-логики управления тегами
+    /// Сервис бизнес-логики управления тегами.
     /// </summary>
     public class TagService : ITagService
     {
@@ -28,25 +26,32 @@ namespace Blog.BLL.Services
             if (existing != null)
                 return ServiceResult<TagDto>.Conflict("Тег с таким именем уже существует.");
 
-            var tag = new Tag { Name = cleanName, CreatorId = currentUserId };
+            var tag = new Tag
+            {
+                Name = cleanName,
+                CreatorId = currentUserId
+            };
+
             await _tagRepo.AddAsync(tag);
             await _tagRepo.SaveChangesAsync();
 
-            return ServiceResult<TagDto>.Ok(new TagDto(tag.Id, tag.Name, tag.CreatorId, 0));
+            return ServiceResult<TagDto>.Ok(new TagDto(tag.Id, tag.Name, 0));
         }
 
-        public async Task<IEnumerable<TagDto>> GetAllAsync()
+        public async Task<ServiceResult<IEnumerable<TagDto>>> GetAllAsync()
         {
             var tags = await _tagRepo.GetAllAsync();
-            return tags.Select(t => new TagDto(t.Id, t.Name, t.CreatorId, t.Articles.Count));
+            var result = tags.Select(t => new TagDto(t.Id, t.Name, t.Articles.Count)).ToList();
+            return ServiceResult<IEnumerable<TagDto>>.Ok(result);
         }
 
-        public async Task<TagDto?> GetByIdAsync(int id)
+        public async Task<ServiceResult<TagDto>> GetByIdAsync(int id)
         {
             var tag = await _tagRepo.GetByIdAsync(id);
-            if (tag == null) return null;
+            if (tag == null)
+                return ServiceResult<TagDto>.NotFound("Тег не найден.");
 
-            return new TagDto(tag.Id, tag.Name, tag.CreatorId, tag.Articles.Count);
+            return ServiceResult<TagDto>.Ok(new TagDto(tag.Id, tag.Name, tag.Articles.Count));
         }
 
         public async Task<ServiceResult> UpdateAsync(int id, UpdateTagDto dto, string currentUserId, bool isAdmin)
@@ -55,7 +60,6 @@ namespace Blog.BLL.Services
             if (tag == null)
                 return ServiceResult.NotFound("Тег не найден.");
 
-            // Модератор НЕ имеет права редактировать теги. Только создатель тега или Администратор
             if (tag.CreatorId != currentUserId && !isAdmin)
                 return ServiceResult.Forbidden("Вы можете редактировать только теги собственного авторства.");
 
@@ -76,7 +80,6 @@ namespace Blog.BLL.Services
             if (tag == null)
                 return ServiceResult.NotFound("Тег не найден.");
 
-            // Модератор НЕ имеет права удалять теги. Только создатель или Администратор
             if (tag.CreatorId != currentUserId && !isAdmin)
                 return ServiceResult.Forbidden("Вы можете удалять только теги собственного авторства.");
 

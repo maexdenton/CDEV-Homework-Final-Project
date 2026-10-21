@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Blog.Web.Controllers
 {
     /// <summary>
-    /// Контроллер управления пользователями и регистрации.
-    /// Предоставляет RESTful endpoints для CRUD-операций над пользователями
+    /// REST API для CRUD-операций над пользователями.
+    /// Наследуется от <see cref="BaseApiController"/>, который предоставляет
+    /// общие механизмы маппинга результатов бизнес-логики в HTTP-ответы
+    /// и проверки ролей текущего пользователя.
     /// </summary>
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -22,9 +24,11 @@ namespace Blog.Web.Controllers
         }
 
         /// <summary>
-        /// Регистрация нового пользователя. Открытый доступ.
-        /// Автоматически присваивает базовую роль "Пользователь"
+        /// Регистрирует нового пользователя с базовой ролью «Пользователь».
+        /// Возвращает 201 Created, а при занятом email — 409 Conflict.
         /// </summary>
+        /// <param name="dto">Данные для регистрации.</param>
+        /// <returns>Созданный пользователь с кодом 201 или ошибка конфликта.</returns>
         [HttpPost("register")]
         [AllowAnonymous]
         [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
@@ -32,24 +36,30 @@ namespace Blog.Web.Controllers
         public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
         {
             var result = await _userService.RegisterAsync(dto);
-            return ToActionResult(result, user => CreatedAtAction(nameof(GetById), new { id = user.Id }, user));
+            return ToActionResult(result, user =>
+                CreatedAtAction(nameof(GetById), new { id = user.Id }, user));
         }
 
         /// <summary>
-        /// Получение реестра всех пользователей. Доступно только Администратору
+        /// Возвращает список всех пользователей.
+        /// Доступно только администратору (политика <see cref="AppPermissions.UsersView"/>).
         /// </summary>
+        /// <returns>Список пользователей.</returns>
         [HttpGet]
         [Authorize(Policy = AppPermissions.UsersView)]
         [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll()
         {
-            var users = await _userService.GetAllAsync();
-            return Ok(users);
+            var result = await _userService.GetAllAsync();
+            return ToActionResult(result, Ok);
         }
 
         /// <summary>
-        /// Просмотр профиля: Администратор может просматривать любого, Пользователь — только себя
+        /// Возвращает профиль пользователя по идентификатору.
+        /// Администратор может просматривать любого пользователя, обычный пользователь — только себя.
         /// </summary>
+        /// <param name="id">Идентификатор пользователя.</param>
+        /// <returns>Профиль пользователя или 403, если доступ запрещен.</returns>
         [HttpGet("{id}")]
         [Authorize]
         [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
@@ -61,8 +71,12 @@ namespace Blog.Web.Controllers
         }
 
         /// <summary>
-        /// Редактирование профиля: только владелец или Администратор
+        /// Обновляет профиль пользователя.
+        /// Доступно только владельцу профиля или администратору.
         /// </summary>
+        /// <param name="id">Идентификатор пользователя.</param>
+        /// <param name="dto">Данные для обновления.</param>
+        /// <returns>Результат операции (204 No Content при успехе).</returns>
         [HttpPut("{id}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -74,8 +88,11 @@ namespace Blog.Web.Controllers
         }
 
         /// <summary>
-        /// Удаление аккаунта: только Администратор
+        /// Удаляет учетную запись пользователя.
+        /// Доступно только администратору (политика <see cref="AppPermissions.UsersDelete"/>).
         /// </summary>
+        /// <param name="id">Идентификатор пользователя.</param>
+        /// <returns>Результат операции (204 No Content при успехе).</returns>
         [HttpDelete("{id}")]
         [Authorize(Policy = AppPermissions.UsersDelete)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -87,8 +104,12 @@ namespace Blog.Web.Controllers
         }
 
         /// <summary>
-        /// Управление ролями: только Администратор
+        /// Изменяет роль пользователя.
+        /// Доступно только администратору (политика <see cref="AppPermissions.RolesManage"/>).
         /// </summary>
+        /// <param name="id">Идентификатор пользователя.</param>
+        /// <param name="dto">Данные с новой ролью.</param>
+        /// <returns>Результат операции (204 No Content при успехе).</returns>
         [HttpPut("{id}/role")]
         [Authorize(Policy = AppPermissions.RolesManage)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]

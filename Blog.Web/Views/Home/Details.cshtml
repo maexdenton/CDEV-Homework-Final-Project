@@ -4,36 +4,17 @@
 
 @{
     ViewData["Title"] = Model.Title;
-    
-    // Получение ID авторизованного пользователя и его прав
+
     var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var isElevated = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Moderator);
 
-    // Право на управление статьей: автор, администратор или модератор
     var canManageArticle = isAuthenticated && (Model.AuthorId == currentUserId || isElevated);
-}
-
-<!-- Уведомления об операциях -->
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
-        <span>✔ @TempData["SuccessMessage"]</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
-    </div>
-}
-@if (TempData["ErrorMessage"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
-        <span>⚠ @TempData["ErrorMessage"]</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
-    </div>
 }
 
 <div class="mb-3 d-flex justify-content-between align-items-center">
     <a asp-action="Index" class="btn btn-outline-secondary btn-sm">&larr; Назад ко всем статьям</a>
 
-    @* Панель действий со статьей: видна только автору, модератору и администратору *@
     @if (canManageArticle)
     {
         <div class="d-flex gap-2">
@@ -52,7 +33,6 @@
     }
 </div>
 
-<!-- Отображение статьи -->
 <article class="card shadow-sm mb-4 border-0">
     <div class="card-body p-4">
         <h1 class="card-title display-6 fw-bold mb-3">@Model.Title</h1>
@@ -83,11 +63,9 @@
     </div>
 </article>
 
-<!-- Секция комментариев -->
 <section class="card shadow-sm p-4 mb-5 border-0">
     <h3 class="h4 mb-3">Комментарии (@Model.Comments.Count)</h3>
 
-    <!-- Форма отправки нового комментария -->
     @if (isAuthenticated)
     {
         <form asp-action="AddComment" method="post" class="mb-4">
@@ -106,11 +84,9 @@
         </div>
     }
 
-    <!-- Список существующих комментариев -->
     <div class="list-group list-group-flush">
         @foreach (var comment in Model.Comments)
         {
-            // Право на управление комментарием: автор комментария, администратор или модератор
             var canManageComment = isAuthenticated && (comment.AuthorId == currentUserId || isElevated);
 
             <div class="list-group-item px-0 py-3" id="comment-container-@comment.Id">
@@ -120,7 +96,6 @@
                         <small class="text-muted ms-2">@comment.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</small>
                     </div>
 
-                    @* Кнопки управления комментарием *@
                     @if (canManageComment)
                     {
                         <div class="btn-group btn-group-sm">
@@ -140,12 +115,10 @@
                     }
                 </div>
 
-                <!-- Режим 1: Обычный просмотр комментария -->
                 <div id="comment-view-@comment.Id">
                     <p class="mb-0 text-secondary" style="white-space: pre-wrap;">@comment.Content</p>
                 </div>
 
-                <!-- Режим 2: Инлайн-форма редактирования (скрыта по умолчанию) -->
                 @if (canManageComment)
                 {
                     <div id="comment-edit-@comment.Id" class="d-none mt-2">
@@ -185,7 +158,8 @@
             const viewParagraph = document.querySelector('#comment-view-' + id + ' p');
             const textarea = document.getElementById('comment-textarea-' + id);
 
-            // Восстанавливаем оригинальный текст комментария из блока просмотра
+            // При отмене возвращаем исходный текст, чтобы несохраненные правки
+            // не остались в textarea при повторном открытии формы.
             if (viewParagraph && textarea) {
                 textarea.value = viewParagraph.textContent;
             }

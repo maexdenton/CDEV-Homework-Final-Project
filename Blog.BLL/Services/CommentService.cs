@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
+using System.Threading.Tasks;
 using Blog.BLL.DTOs;
-using Blog.BLL.Security;
 using Blog.DAL.Entities;
 using Blog.DAL.Repositories;
 
 namespace Blog.BLL.Services
 {
     /// <summary>
-    /// Сервис бизнес-логики управления комментариями
+    /// Сервис бизнес-логики управления комментариями с проверкой прав владения.
     /// </summary>
     public class CommentService : ICommentService
     {
@@ -31,7 +31,7 @@ namespace Blog.BLL.Services
             var comment = new Comment
             {
                 ArticleId = dto.ArticleId,
-                AuthorId = currentUserId, // Защита: автор берется из claims
+                AuthorId = currentUserId,
                 Content = dto.Content.Trim(),
                 CreatedAt = DateTime.UtcNow
             };
@@ -41,8 +41,12 @@ namespace Blog.BLL.Services
 
             var created = await _commentRepo.GetWithDetailsByIdAsync(comment.Id);
             return ServiceResult<CommentDto>.Ok(new CommentDto(
-                created!.Id, created.ArticleId, created.Content, created.CreatedAt,
-                created.AuthorId, $"{created.Author.FirstName} {created.Author.LastName}".Trim()
+                created!.Id,
+                created.ArticleId,
+                created.Content,
+                created.CreatedAt,
+                created.AuthorId,
+                $"{created.Author.FirstName} {created.Author.LastName}".Trim()
             ));
         }
 
@@ -50,7 +54,11 @@ namespace Blog.BLL.Services
         {
             var comments = await _commentRepo.GetAllWithDetailsAsync();
             return comments.Select(c => new CommentDto(
-                c.Id, c.ArticleId, c.Content, c.CreatedAt, c.AuthorId,
+                c.Id,
+                c.ArticleId,
+                c.Content,
+                c.CreatedAt,
+                c.AuthorId,
                 $"{c.Author.FirstName} {c.Author.LastName}".Trim()
             ));
         }
@@ -58,10 +66,15 @@ namespace Blog.BLL.Services
         public async Task<CommentDto?> GetByIdAsync(int id)
         {
             var c = await _commentRepo.GetWithDetailsByIdAsync(id);
-            if (c == null) return null;
+            if (c == null)
+                return null;
 
             return new CommentDto(
-                c.Id, c.ArticleId, c.Content, c.CreatedAt, c.AuthorId,
+                c.Id,
+                c.ArticleId,
+                c.Content,
+                c.CreatedAt,
+                c.AuthorId,
                 $"{c.Author.FirstName} {c.Author.LastName}".Trim()
             );
         }
@@ -72,7 +85,6 @@ namespace Blog.BLL.Services
             if (comment == null)
                 return ServiceResult.NotFound("Комментарий не найден.");
 
-            // Владелец, Модератор или Администратор
             if (comment.AuthorId != currentUserId && !isElevated)
                 return ServiceResult.Forbidden("Вы можете редактировать только собственные комментарии.");
 
@@ -88,7 +100,6 @@ namespace Blog.BLL.Services
             if (comment == null)
                 return ServiceResult.NotFound("Комментарий не найден.");
 
-            // Владелец, Модератор или Администратор
             if (comment.AuthorId != currentUserId && !isElevated)
                 return ServiceResult.Forbidden("Вы не имеете права удалять данный комментарий.");
 

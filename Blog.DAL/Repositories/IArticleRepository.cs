@@ -1,29 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using Blog.DAL.Entities;
 
 namespace Blog.DAL.Repositories
 {
     /// <summary>
-    /// Контракт репозитория для работы с публикациями блога
+    /// Контракт репозитория для работы с сущностями «Статья».
     /// </summary>
     public interface IArticleRepository : IRepository<Article>
     {
-        /// <summary>
-        /// Возвращает статьи с фильтрацией по ключевым словам и тегу
-        /// </summary>
-        Task<IEnumerable<Article>> GetFilteredAsync(string? search, string? tag);
+        new Task<IEnumerable<Article>> GetAllAsync();
 
-        /// <summary>
-        /// Возвращает статью по идентификатору с загрузкой автора, тегов и комментариев
-        /// </summary>
+        new Task<Article?> GetByIdAsync(int id);
+
         Task<Article?> GetDetailedByIdAsync(int id);
 
-        /// <summary>
-        /// Возвращает все статьи, опубликованные конкретным автором
-        /// </summary>
-        /// <param name="authorId">Идентификатор автора в Identity</param>
+        Task<IEnumerable<Article>> GetFilteredAsync(string? search, string? tag);
+
         Task<IEnumerable<Article>> GetByAuthorIdAsync(string authorId);
     }
 }

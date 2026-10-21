@@ -1,98 +1,63 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Blog.BLL.Security
+﻿namespace Blog.BLL.Security
 {
     /// <summary>
-    /// Системные роли приложения
+    /// Содержит константы, используемые при настройке аутентификации, авторизации и JWT-токенов.
     /// </summary>
-    public static class AppRoles
+    public static class SecurityConstants
     {
-        public const string Administrator = "Администратор";
-        public const string Moderator = "Модератор";
-        public const string User = "Пользователь";
-    }
-
-    /// <summary>
-    /// Детализированные права (Permissions), связываемые через Claims с ролями пользователей
-    /// </summary>
-    public static class AppPermissions
-    {
-        public const string UsersView = "Permissions.Users.View";
-        public const string UsersCreate = "Permissions.Users.Create";
-        public const string UsersUpdate = "Permissions.Users.Update";
-        public const string UsersDelete = "Permissions.Users.Delete";
-
-        public const string ArticlesView = "Permissions.Articles.View";
-        public const string ArticlesCreate = "Permissions.Articles.Create";
-        public const string ArticlesUpdate = "Permissions.Articles.Update";
-        public const string ArticlesDelete = "Permissions.Articles.Delete";
-
-        public const string CommentsView = "Permissions.Comments.View";
-        public const string CommentsCreate = "Permissions.Comments.Create";
-        public const string CommentsUpdate = "Permissions.Comments.Update";
-        public const string CommentsDelete = "Permissions.Comments.Delete";
-
-        public const string TagsView = "Permissions.Tags.View";
-        public const string TagsCreate = "Permissions.Tags.Create";
-        public const string TagsUpdate = "Permissions.Tags.Update";
-        public const string TagsDelete = "Permissions.Tags.Delete";
-
-        public const string RolesManage = "Permissions.Roles.Manage";
+        /// <summary>
+        /// Названия ролей, применяемые в системе.
+        /// </summary>
+        public static class Roles
+        {
+            public const string Admin = "Admin";
+            public const string Moderator = "Moderator";
+            public const string User = "User";
+        }
 
         /// <summary>
-        /// Полный перечень всех прав в системе для автоматического связывания с ролью Администратора
+        /// Названия политик авторизации.
         /// </summary>
-        public static readonly IReadOnlyList<string> All = new[]
+        public static class Policies
         {
-        UsersView, UsersCreate, UsersUpdate, UsersDelete,
-        ArticlesView, ArticlesCreate, ArticlesUpdate, ArticlesDelete,
-        CommentsView, CommentsCreate, CommentsUpdate, CommentsDelete,
-        TagsView, TagsCreate, TagsUpdate, TagsDelete,
-        RolesManage
-    };
-    }
+            public const string RequireAdminRole = "RequireAdminRole";
+            public const string RequireModeratorRole = "RequireModeratorRole";
+            public const string RequireAuthenticatedUser = "RequireAuthenticatedUser";
+        }
 
-    /// <summary>
-    /// Статусы завершения бизнес-операции, исключающие смешивание кодов ошибок в HTTP
-    /// </summary>
-    public enum ResultStatus
-    {
-        Success,
-        NotFound,
-        Forbidden,
-        Conflict,
-        InvalidData
-    }
+        /// <summary>
+        /// Типы утверждений (claims), используемые в токенах.
+        /// </summary>
+        public static class ClaimTypes
+        {
+            public const string UserId = "userId";
+            public const string UserName = "userName";
+            public const string Email = "email";
+            public const string Role = "role";
+        }
 
-    /// <summary>
-    /// Универсальная обертка результата бизнес-операции со строгой семантикой
-    /// </summary>
-    public class ServiceResult
-    {
-        public bool Succeeded => Status == ResultStatus.Success;
-        public ResultStatus Status { get; init; }
-        public string? Message { get; init; }
+        /// <summary>
+        /// Параметры JWT-токена.
+        /// </summary>
+        public static class Jwt
+        {
+            public const string Issuer = "Blog.Api";
+            public const string Audience = "Blog.Client";
 
-        public static ServiceResult Ok() => new() { Status = ResultStatus.Success };
-        public static ServiceResult NotFound(string message = "Запрошенный ресурс не найден.") => new() { Status = ResultStatus.NotFound, Message = message };
-        public static ServiceResult Forbidden(string message = "У вас недостаточно прав для выполнения данной операции.") => new() { Status = ResultStatus.Forbidden, Message = message };
-        public static ServiceResult Conflict(string message) => new() { Status = ResultStatus.Conflict, Message = message };
-        public static ServiceResult BadRequest(string message) => new() { Status = ResultStatus.InvalidData, Message = message };
-    }
+            // Срок жизни access-токена намеренно короткий: клиент обновляет его через refresh-токен.
+            public const int AccessTokenLifetimeMinutes = 15;
+            public const int RefreshTokenLifetimeDays = 7;
 
-    /// <summary>
-    /// Обобщенный результат операции с полезной нагрузкой
-    /// </summary>
-    public class ServiceResult<T> : ServiceResult
-    {
-        public T? Data { get; init; }
+            public const string SecretKeyConfigurationName = "Jwt:SecretKey";
+        }
 
-        public static ServiceResult<T> Ok(T data) => new() { Status = ResultStatus.Success, Data = data };
-        public new static ServiceResult<T> NotFound(string message = "Запрошенный ресурс не найден.") => new() { Status = ResultStatus.NotFound, Message = message };
-        public new static ServiceResult<T> Forbidden(string message = "У вас недостаточно прав для выполнения данной операции.") => new() { Status = ResultStatus.Forbidden, Message = message };
-        public new static ServiceResult<T> Conflict(string message) => new() { Status = ResultStatus.Conflict, Message = message };
-        public new static ServiceResult<T> BadRequest(string message) => new() { Status = ResultStatus.InvalidData, Message = message };
+        /// <summary>
+        /// Имена cookie, используемых для аутентификации.
+        /// </summary>
+        public static class Cookies
+        {
+            public const string AccessToken = "access_token";
+            public const string RefreshToken = "refresh_token";
+        }
     }
 }

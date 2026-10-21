@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
     /// <summary>
-    /// DTO создания статьи
+    /// DTO для создания статьи.
     /// </summary>
     public class CreateArticleDto
     {
@@ -25,7 +24,7 @@ namespace Blog.BLL.DTOs
     }
 
     /// <summary>
-    /// DTO редактирования статьи
+    /// DTO для редактирования статьи.
     /// </summary>
     public class UpdateArticleDto
     {
@@ -41,7 +40,7 @@ namespace Blog.BLL.DTOs
     }
 
     /// <summary>
-    /// DTO краткого отображения статьи для списков
+    /// DTO для краткого отображения статьи в списках.
     /// </summary>
     public record ArticleDto(
         int Id,
@@ -56,7 +55,7 @@ namespace Blog.BLL.DTOs
     );
 
     /// <summary>
-    /// DTO подробного отображения статьи с комментариями
+    /// DTO для подробного отображения статьи с комментариями.
     /// </summary>
     public record ArticleDetailsDto(
         int Id,

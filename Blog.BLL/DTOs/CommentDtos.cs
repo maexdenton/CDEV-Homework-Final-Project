@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.ComponentModel.DataAnnotations;
 
 namespace Blog.BLL.DTOs
 {
     /// <summary>
-    /// DTO добавления комментария к публикации
+    /// DTO для добавления комментария к публикации.
     /// </summary>
     public class CreateCommentDto
     {
@@ -22,7 +20,7 @@ namespace Blog.BLL.DTOs
     }
 
     /// <summary>
-    /// DTO редактирования существующего комментария
+    /// DTO для редактирования существующего комментария.
     /// </summary>
     public class UpdateCommentDto
     {
@@ -32,7 +30,7 @@ namespace Blog.BLL.DTOs
     }
 
     /// <summary>
-    /// DTO отображения комментария
+    /// DTO для отображения комментария.
     /// </summary>
     public record CommentDto(
         int Id,
