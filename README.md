@@ -37,14 +37,61 @@
 
 ## 🏗️ Архитектура решения
 
-Проект построен по трехуровневой архитектуре с явным разделением ответственности.
+Проект построен по трехуровневой архитектуре с явным разделением ответственности:
 
-```text
-Blog.Web (Presentation Layer)    →  Контроллеры MVC и API, Razor Views, Middlewares, ViewModels
-   │
-Blog.BLL (Business Logic Layer)  →  Сервисы (Article, Comment, Tag, User), DTO, права доступа
-   │
-Blog.DAL (Data Access Layer)     →  Сущности, BlogDbContext, Fluent API конфигурации, Репозитории
+```mermaid
+flowchart TD
+    subgraph Presentation["Blog.Web (Presentation Layer)"]
+        direction TB
+        MVC[MVC Controllers]
+        API[API Controllers]
+        Views[Razor Views]
+        VM[ViewModels]
+        MW[Middlewares<br/>Exception Handler, Logging]
+    end
+
+    subgraph BusinessLogic["Blog.BLL (Business Logic Layer)"]
+        direction TB
+        Services[Services<br/>Article, Comment, Tag, User]
+        DTOs[DTOs]
+        Security[Security Constants & Claims]
+    end
+
+    subgraph DataAccess["Blog.DAL (Data Access Layer)"]
+        direction TB
+        Repos[Repositories & Interfaces]
+        DbContext[BlogDbContext]
+        Entities[Entities<br/>Article, Comment, Tag, User]
+        Config[Fluent API Configurations]
+    end
+
+    subgraph External["Внешние зависимости"]
+        DB[(SQL Server)]
+        Swagger[Swagger UI]
+        Logger[(Serilog Files)]
+    end
+
+    API --> Services
+    MVC --> Services
+    MVC --> Views
+    MW -.-> Logger
+    
+    Services --> Repos
+    Services --> DTOs
+    
+    Repos --> DbContext
+    DbContext --> Entities
+    DbContext --> Config
+    
+    Presentation -.->|DI Registration| DataAccess
+    
+    DbContext -.->|EF Core| DB
+    API -.->|Документация| Swagger
+
+    classDef layer fill:#f9f9f9,stroke:#333,stroke-width:2px
+    classDef external fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px
+    class Presentation,BusinessLogic,DataAccess layer
+    class External external
 ```
 
 #### Зависимости между слоями
